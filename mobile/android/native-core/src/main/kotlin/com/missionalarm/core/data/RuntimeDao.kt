@@ -57,6 +57,16 @@ abstract class RuntimeDao {
     """,
   )
   abstract fun findDueOccurrenceIds(nowMs: Long): List<String>
+
+  @Query(
+    """
+    SELECT * FROM alarm_occurrence
+    WHERE alarm_id = :alarmId AND state IN ('PENDING_OS', 'SCHEDULED_OS')
+    ORDER BY scheduled_at_utc_ms, id
+    LIMIT 1
+    """,
+  )
+  abstract fun findNextOccurrence(alarmId: String): AlarmOccurrenceEntity?
 }
 
 @Dao

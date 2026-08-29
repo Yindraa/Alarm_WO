@@ -1,4 +1,7 @@
 import NativeMissionAlarm, {
+  type AlarmDraftInput,
+  type AlarmEditorSnapshot,
+  type CommandAck,
   type ContractInfo,
 } from './specs/NativeMissionAlarm';
 
@@ -17,4 +20,57 @@ export async function getContractInfo(): Promise<ContractInfo> {
   return info;
 }
 
-export type {ContractInfo};
+export type SaveAlarmDraft = Omit<AlarmDraftInput, 'contractVersion'>;
+
+export async function saveAlarmConfiguration(
+  draft: SaveAlarmDraft,
+): Promise<CommandAck> {
+  validateDraft(draft);
+  return NativeMissionAlarm.saveAlarmConfiguration({
+    ...draft,
+    contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+  });
+}
+
+export async function getAlarmEditorSnapshot(
+  alarmId: string | null,
+): Promise<AlarmEditorSnapshot> {
+  if (alarmId !== null) {
+    requireUuid(alarmId, 'alarmId');
+  }
+  const snapshot = await NativeMissionAlarm.getAlarmEditorSnapshot(
+    MISSION_ALARM_CONTRACT_VERSION,
+    alarmId,
+  );
+  if (snapshot.alarm !== null) {
+    requireUuid(snapshot.alarm.id, 'snapshot.alarm.id');
+    if (snapshot.alarm.revision < 1) {
+      throw new Error('INTERNAL_CONTRACT_ERROR');
+    }
+  }
+  return snapshot;
+}
+
+function validateDraft(draft: SaveAlarmDraft): void {
+  requireUuid(draft.commandId, 'commandId');
+  if (draft.alarmId !== null) {
+    requireUuid(draft.alarmId, 'alarmId');
+  }
+  if (draft.label.trim().length < 1 || draft.label.trim().length > 80) {
+    throw new Error('VALIDATION_FAILED');
+  }
+  if (!Number.isInteger(draft.localTimeMinutes) || draft.localTimeMinutes < 0 || draft.localTimeMinutes > 1439) {
+    throw new Error('VALIDATION_FAILED');
+  }
+  if (!Number.isInteger(draft.target) || draft.target < 1) {
+    throw new Error('VALIDATION_FAILED');
+  }
+}
+
+function requireUuid(value: string, _field: string): void {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)) {
+    throw new Error('INVALID_ARGUMENT');
+  }
+}
+
+export type {AlarmEditorSnapshot, CommandAck, ContractInfo};

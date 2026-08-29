@@ -27,6 +27,7 @@ This registry links accepted requirements to executable tests or qualification e
 | M1 command idempotency/revision | Room transaction tests | Same command replay, conflicting reuse rejection, optimistic revision, atomic receipt, and rollback pass | Pass (disabled draft) | M1 |
 | TR-INV-009 transactional outbox lifecycle | Room instrumentation tests | Owner-scoped lease/ack, scheduled retry, attempt count, and expired-lease reclaim pass | Pass (persistence) | M1 |
 | QR draft readiness | SQLite negative test | Unregistered QR may be stored disabled; database rejects enable until native registration fields exist | Pass | M1 |
+| API save/editor vertical | Codegen, Jest, Android bridge instrumentation | Contract-version injection, JS validation, persistent save/query DTO round-trip, and stable idempotency error mapping pass | Pass (disabled draft) | M1 |
 | M2 alarm runtime safety | Physical-device trigger/recovery matrix | Not implemented; devices unassigned | Planned | M2 |
 | M4 Math terminal path | E2E trigger-to-history evidence | Not implemented | Planned | M4 |
 | M5 QR security path | Native scanner/security tests | Not implemented | Planned | M5 |

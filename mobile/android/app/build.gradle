@@ -84,6 +84,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
         debug {
@@ -129,6 +130,9 @@ dependencies {
     implementation(project(":mission-camera"))
     debugImplementation(project(":test-support"))
     internalImplementation(project(":test-support"))
+    androidTestImplementation "androidx.test:core-ktx:1.7.0"
+    androidTestImplementation "androidx.test.ext:junit:1.3.0"
+    androidTestImplementation "androidx.test:runner:1.7.0"
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
