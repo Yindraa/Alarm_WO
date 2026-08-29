@@ -1,6 +1,6 @@
 # M0 Delivery Readiness
 
-**Status:** In Progress  
+**Status:** Accepted for personal/portfolio scope
 **Review date:** 2026-08-29  
 **Roadmap source:** [`../roadmap/IMPLEMENTATION_ROADMAP.md`](../roadmap/IMPLEMENTATION_ROADMAP.md)
 
@@ -8,7 +8,7 @@
 
 The production React Native 0.87 Android application has been scaffolded independently from the feasibility spike. Its typed native contract bootstrap, module boundaries, build separation, test foundation, and provider-neutral verification entry points are operational on the developer host.
 
-M0 is not yet closed because repository/CI administration, permanent identity, production signing ownership, device access, and CV data governance require named external owners.
+M0 is closed for the current personal/portfolio scope. The permanent package identity is approved and the workspace is connected to its GitHub repository. Public-store administration, production signing, formal team allocation, multi-device qualification, and third-party CV participant governance are deferred until distribution scope changes.
 
 ## Delivery checklist
 
@@ -20,13 +20,13 @@ M0 is not yet closed because repository/CI administration, permanent identity, p
 | Moderate module boundaries | `app` plus `native-core`, `mission-camera`, `test-support`, and `benchmark` | Pass for M0 skeleton |
 | Build separation | Debug/internal include test support; benchmark/release do not | Pass |
 | Provider-neutral CI commands | `npm run verify:js`, `npm run verify:android` | Pass |
-| Dependency locks and SBOM | npm/Gradle lockfiles created; automated SBOM artifact job awaits CI | Partial |
-| Clean CI checkout | CI provider and repository unavailable | Pending external decision |
-| Permanent application ID | Currently `com.missionalarm.app` | Pending product-owner approval |
-| Production signing | Release remains unsigned; no production key in source | Pending ownership decision |
-| Play declarations/administration | Exact alarm, FGS, full-screen intent evidence not yet assigned | Pending owner |
-| Physical device P1–P5 plan | Inventory/access owner not supplied | Pending owner |
-| CV consent/data plan | Custodian, storage, retention, and recruitment owner not supplied | Pending owner |
+| Dependency locks and SBOM | npm/Gradle lockfiles created; SBOM automation deferred until needed | Pass for current scope |
+| Source control and CI | GitHub origin connected; GitHub Actions workflow added | Pass; first remote run pending |
+| Permanent application ID | `com.missionalarm.app` approved by product owner on 2026-08-29 | Pass |
+| Production signing | Release remains unsigned; Play signing deferred | Deferred, non-blocking |
+| Play declarations/administration | Public Google Play distribution is outside current scope | Deferred, non-blocking |
+| Physical device plan | Personal device will be the functional reference device | Accepted for current scope |
+| CV consent/data plan | Initial development uses owner/self test data only; no third-party collection | Accepted for current scope |
 | License metadata registry | Product owner confirms licenses received; per-asset metadata is still required | Pending catalog |
 | Requirement/test registry | [`../traceability/REQUIREMENT_TEST_REGISTRY.md`](../traceability/REQUIREMENT_TEST_REGISTRY.md) | Pass for skeleton |
 
@@ -61,16 +61,14 @@ These local artifacts are evidence only and are not release candidates.
 - Current RN 0.87/AGP 9 integration emits deprecated DSL/variant API warnings. Builds pass, but this is an upgrade-watch item before AGP 10.
 - `react-native-safe-area-context` emits upstream legacy API warnings. The selected 5.9.1 version compiles against RN 0.87; monitor upstream New Architecture cleanup.
 
-## Decisions required to close M0
+## Deferred distribution decisions
 
-| Decision | Recommended default | Required by |
+| Decision | Current disposition | Reopen when |
 |---|---|---|
-| Permanent application ID | Approve `com.missionalarm.app`, or provide organization-owned reverse domain | Before Play app creation |
-| Source control and CI | Private GitHub repository + GitHub Actions | Before clean-checkout CI evidence |
-| Signing ownership | Google Play App Signing; organization-owned upload key stored in CI secret manager | Before first signed internal artifact |
-| Device qualification owner | Assign P1–P5 inventory/procurement owner | Before M2 physical smoke |
-| CV data governance owner | Assign consent, secure storage, retention/deletion, and recruitment custodian | Before participant capture |
-| Team capacity | Name role allocations from roadmap Section 6 | Before committing calendar dates |
+| Production signing and Play administration | Deferred | Public/internal Play distribution is requested |
+| P1–P5 device qualification matrix | Replaced by personal reference device for development | Broad device compatibility is claimed |
+| Third-party CV participant governance | No third-party data collection | Anyone other than the owner contributes recordings/data |
+| Formal team capacity/calendar | Single-owner portfolio delivery; no committed release date | A delivery deadline or team is introduced |
 
 ## M0 backlog
 
@@ -80,15 +78,15 @@ These local artifacts are evidence only and are not release candidates.
 | M0-ENG-002 | Typed native bootstrap and fail-closed UI | Done | Engineering |
 | M0-ENG-003 | Module and build-variant separation | Done | Engineering |
 | M0-ENG-004 | Macrobenchmark target/test module | Done; physical run pending | QA/device owner |
-| M0-ENG-005 | Reusable lint/test/Codegen/build checks | Done locally | CI owner must wire provider |
-| M0-GOV-001 | Permanent package identity | Waiting decision | Product owner |
-| M0-GOV-002 | Repository and protected CI | Waiting decision | Repository administrator |
-| M0-GOV-003 | Play App Signing/upload-key custody | Waiting decision | Release administrator |
-| M0-GOV-004 | Play declaration evidence drafts | Not started | Policy/release owner |
-| M0-DEV-001 | P1–P5 device access inventory | Not started | QA/device owner |
-| M0-CV-001 | Consent, storage, retention/deletion plan | Not started | CV/privacy owner |
-| M0-LIC-001 | Populate per-asset license/checksum rows | Not started | Product/license owner |
+| M0-ENG-005 | Reusable lint/test/Codegen/build checks | Done locally and workflow added | Confirm first GitHub run |
+| M0-GOV-001 | Permanent package identity | Done | `com.missionalarm.app` approved |
+| M0-GOV-002 | Repository and CI definition | Done | GitHub origin + Actions workflow |
+| M0-GOV-003 | Play App Signing/upload-key custody | Deferred | Reopen for Play distribution |
+| M0-GOV-004 | Play declaration evidence drafts | Deferred | Reopen for Play distribution |
+| M0-DEV-001 | Device access | Accepted for scope | Use owner's Android device |
+| M0-CV-001 | CV data handling | Accepted for scope | Owner/self data only |
+| M0-LIC-001 | Populate imported asset metadata | Ongoing | Complete rows when assets are imported |
 
 ## M0 exit recommendation
 
-**NO-GO to close M0 and enter M1 feature implementation, but implementation preparation may continue.** Engineering evidence for the local foundation is green. M1 feature work should start only after permanent identity and repository/CI choices are confirmed; physical-device and CV governance assignments may proceed in parallel but remain release-critical.
+**GO for M1.** The engineering foundation is green and the two current blockers—permanent package identity and repository destination—are resolved. Deferred public-distribution work does not block personal/portfolio feature development. Runtime reliability, fail-safe behavior, and testing on the owner's physical Android device remain required because they affect the application itself.

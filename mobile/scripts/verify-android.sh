@@ -19,6 +19,8 @@ fi
 
 cd android
 ./gradlew \
+  :native-core:testDebugUnitTest \
+  :native-core:assembleDebugAndroidTest \
   :app:generateCodegenArtifactsFromSchema \
   :app:lintDebug \
   :app:assembleDebug \

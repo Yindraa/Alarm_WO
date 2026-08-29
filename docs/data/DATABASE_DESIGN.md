@@ -257,11 +257,11 @@ Tepat satu row per alarm.
 | `pushup_profile_version` | TEXT | Yes | Required for Push-up |
 | `math_operations_mask` | INTEGER | Yes | Addition=1, subtraction=2, multiplication=4; nonzero subset of 7 |
 | `math_generator_version` | TEXT | Yes | Required for Math |
-| `qr_reference_digest` | BLOB | Yes | Required for QR; HMAC output only |
-| `qr_digest_version` | TEXT | Yes | Normalization/digest contract version |
-| `qr_key_alias` | TEXT | Yes | Keystore alias, not secret material |
+| `qr_reference_digest` | BLOB | Yes | Required before a QR alarm can be enabled; HMAC output only |
+| `qr_digest_version` | TEXT | Yes | Required before enable; normalization/digest contract version |
+| `qr_key_alias` | TEXT | Yes | Required before enable; Keystore alias, not secret material |
 
-Type-specific nullability diperiksa oleh database `CHECK` dan domain validator. Field mission lain harus `NULL`, sehingga stale configuration tidak ikut tersnapshot.
+Type-specific nullability diperiksa oleh database trigger dan domain validator. QR draft yang disabled boleh memiliki ketiga registration field bernilai `NULL`, karena registration dilakukan native setelah draft memperoleh alarm ID; transition ke enabled ditolak sampai ketiganya tersedia. Field mission tipe lain harus `NULL`, sehingga stale configuration tidak ikut tersnapshot.
 
 ### 5.3 `alarm_occurrence`
 

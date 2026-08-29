@@ -14,13 +14,14 @@ Dokumentasi ini menjadi sumber acuan perancangan dan implementasi Mission Alarm.
 | 6. Database & Contracts | Accepted | [`data/DATABASE_DESIGN.md`](data/DATABASE_DESIGN.md), [`api/API_CONTRACT.md`](api/API_CONTRACT.md) |
 | 7. UI/UX | Accepted | [`ux/UI_UX_SPECIFICATION.md`](ux/UI_UX_SPECIFICATION.md) |
 | 8. Testing Strategy | Accepted | [`testing/TESTING_STRATEGY.md`](testing/TESTING_STRATEGY.md) |
-| 9. Implementation Roadmap | Accepted — implementation M0 started | [`roadmap/IMPLEMENTATION_ROADMAP.md`](roadmap/IMPLEMENTATION_ROADMAP.md) |
+| 9. Implementation Roadmap | Accepted — personal/portfolio scope amendment active | [`roadmap/IMPLEMENTATION_ROADMAP.md`](roadmap/IMPLEMENTATION_ROADMAP.md) |
 
 ## Implementasi aktif
 
 | Milestone | Status | Evidence |
 |---|---|---|
-| M0 — Delivery readiness | In Progress — local engineering foundation green; external ownership decisions pending | [`implementation/M0_DELIVERY_READINESS.md`](implementation/M0_DELIVERY_READINESS.md) |
+| M0 — Delivery readiness | Accepted for personal/portfolio scope | [`implementation/M0_DELIVERY_READINESS.md`](implementation/M0_DELIVERY_READINESS.md) |
+| M1 — Native foundation vertical | In Progress — pure Kotlin domain increment started | [`implementation/M1_NATIVE_FOUNDATION.md`](implementation/M1_NATIVE_FOUNDATION.md) |
 
 - Requirement/test traceability: [`traceability/REQUIREMENT_TEST_REGISTRY.md`](traceability/REQUIREMENT_TEST_REGISTRY.md)
 - License and asset metadata: [`governance/LICENSE_REGISTRY.md`](governance/LICENSE_REGISTRY.md)

@@ -722,6 +722,20 @@ Seluruh keputusan berikut disetujui product owner pada 2026-08-29.
 - Scope guardrails mencegah post-MVP feature masuk tanpa change control.
 - M0 start checklist mengidentifikasi input yang dibutuhkan sebelum tanggal kalender dikunci.
 
+### 25.1 Personal/portfolio scope amendment — 2026-08-29
+
+Product owner menetapkan bahwa aplikasi saat ini dibuat untuk penggunaan pribadi dan portfolio, tanpa rencana distribusi Google Play dalam waktu dekat. Karena itu:
+
+- permanent application ID `com.missionalarm.app` disetujui;
+- GitHub menjadi source-control provider;
+- Play Console, production signing, store declaration, staged rollout, formal team allocation, dan broad device certification ditunda dan tidak memblokir M1–M6;
+- pengujian fungsional memakai perangkat Android milik product owner;
+- pengembangan CV awal hanya memakai data product owner sendiri; pengumpulan data pihak ketiga dilarang sampai consent/storage/deletion governance diaktifkan;
+- reliability alarm, emergency dismissal, offline behavior, privacy boundary, dan test-hook exclusion tetap wajib karena merupakan kualitas fungsi aplikasi, bukan hanya persyaratan store;
+- milestone M7–M9 dan qualification matrix penuh diaktifkan kembali hanya bila scope berubah menjadi distribusi publik atau klaim kompatibilitas luas.
+
+Amendment ini mengubah deployment/governance gate, bukan product behavior atau safety invariant yang telah diterima.
+
 ## 26. Post-approval execution
 
 Setelah roadmap diterima:
