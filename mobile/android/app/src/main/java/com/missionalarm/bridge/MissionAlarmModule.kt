@@ -14,19 +14,28 @@ import com.missionalarm.app.BuildConfig
 import com.missionalarm.core.data.AlarmDraftRepository
 import com.missionalarm.core.data.AlarmDraftRepositoryException
 import com.missionalarm.core.data.AlarmIdGenerator
+import com.missionalarm.core.data.AlarmSchedulingRepository
+import com.missionalarm.core.data.AlarmSchedulingRepositoryException
 import com.missionalarm.core.data.AlarmWithMission
+import com.missionalarm.core.data.CurrentZoneProvider
+import com.missionalarm.core.data.EffectIdGenerator
+import com.missionalarm.core.data.EnableAlarmCommand
 import com.missionalarm.core.data.MissionAlarmDatabaseFactory
+import com.missionalarm.core.data.OccurrenceIdGenerator
 import com.missionalarm.core.data.SaveAlarmDraftCommand
 import com.missionalarm.core.domain.AlarmId
 import com.missionalarm.core.domain.CommandId
 import com.missionalarm.core.domain.MissionType
+import com.missionalarm.core.domain.OccurrenceId
 import com.missionalarm.core.domain.Revision
 import com.missionalarm.specs.NativeMissionAlarmSpec
+import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.Executors
 
 class MissionAlarmModule(
   private val reactContext: ReactApplicationContext,
+  private val criticalSchedulingCapabilityOverride: (() -> Boolean)? = null,
 ) : NativeMissionAlarmSpec(reactContext) {
   private val executor = Executors.newSingleThreadExecutor { runnable ->
     Thread(runnable, "mission-alarm-native").apply { isDaemon = true }
@@ -41,8 +50,20 @@ class MissionAlarmModule(
       alarmIdGenerator = AlarmIdGenerator { AlarmId.parse(UUID.randomUUID().toString()) },
     )
   }
+  private val schedulingRepositoryDelegate = lazy {
+    AlarmSchedulingRepository(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      currentZoneProvider = CurrentZoneProvider { ZoneId.systemDefault() },
+      occurrenceIdGenerator = OccurrenceIdGenerator {
+        OccurrenceId.parse(UUID.randomUUID().toString())
+      },
+      effectIdGenerator = EffectIdGenerator { UUID.randomUUID().toString() },
+    )
+  }
   private val database by databaseDelegate
   private val repository by repositoryDelegate
+  private val schedulingRepository by schedulingRepositoryDelegate
 
   override fun getName(): String = NAME
 
@@ -89,6 +110,24 @@ class MissionAlarmModule(
             putBoolean("replayed", ack.replayed)
           },
         )
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
+  override fun enableAlarm(input: ReadableMap, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(input.requiredInt("contractVersion"))
+        val command = EnableAlarmCommand(
+          commandId = CommandId.parse(input.requiredString("commandId")),
+          alarmId = AlarmId.parse(input.requiredString("aggregateId")),
+          expectedRevision = Revision.of(input.requiredInt("expectedRevision")),
+        )
+        if (!hasCriticalSchedulingCapability()) throw CapabilityRequired()
+        val ack = schedulingRepository.enable(command)
+        promise.resolve(commandAck(ack.commandId, ack.alarmId, ack.revision, ack.appliedAtMs, ack.replayed))
       } catch (error: Throwable) {
         rejectMapped(promise, error)
       }
@@ -198,7 +237,7 @@ class MissionAlarmModule(
       capability(
         "NOTIFICATIONS",
         notificationsGranted,
-        true,
+        false,
         notificationsAvailable && Build.VERSION.SDK_INT >= 33,
         true,
         notificationsAvailable,
@@ -206,12 +245,38 @@ class MissionAlarmModule(
     )
     putMap(
       "fullScreenIntent",
-      capability("FULL_SCREEN_INTENT", fullScreenGranted, true, false, true, fullScreenAvailable),
+      capability("FULL_SCREEN_INTENT", fullScreenGranted, false, false, true, fullScreenAvailable),
     )
     putMap(
       "camera",
-      capability("CAMERA", cameraGranted, true, cameraAvailable && !cameraGranted, true, cameraAvailable),
+      capability("CAMERA", cameraGranted, false, cameraAvailable && !cameraGranted, true, cameraAvailable),
     )
+  }
+
+  private fun hasCriticalSchedulingCapability(): Boolean {
+    criticalSchedulingCapabilityOverride?.let { return it() }
+    val exactDeclared = Build.VERSION.SDK_INT < 31 ||
+      declaresPermission(Manifest.permission.SCHEDULE_EXACT_ALARM) ||
+      declaresPermission(Manifest.permission.USE_EXACT_ALARM)
+    if (!exactDeclared) return false
+    if (Build.VERSION.SDK_INT < 31) return true
+    val alarmManager = reactContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    return alarmManager.canScheduleExactAlarms()
+  }
+
+  private fun commandAck(
+    commandId: String,
+    alarmId: String,
+    revision: Int,
+    appliedAtMs: Long,
+    replayed: Boolean,
+  ) = Arguments.createMap().apply {
+    putString("commandId", commandId)
+    putString("aggregateType", "ALARM")
+    putString("aggregateId", alarmId)
+    putInt("revision", revision)
+    putDouble("appliedAtMs", appliedAtMs.toDouble())
+    putBoolean("replayed", replayed)
   }
 
   private fun capability(
@@ -250,6 +315,15 @@ class MissionAlarmModule(
       is AlarmDraftRepositoryException.RevisionConflict -> "CONFLICT_REVISION"
       is AlarmDraftRepositoryException.IdempotencyKeyReused -> "IDEMPOTENCY_KEY_REUSED"
       is AlarmDraftRepositoryException.EnabledEditUnsupported -> "INVALID_STATE"
+      is AlarmSchedulingRepositoryException.NotFound -> "NOT_FOUND"
+      is AlarmSchedulingRepositoryException.RevisionConflict -> "CONFLICT_REVISION"
+      is AlarmSchedulingRepositoryException.IdempotencyKeyReused -> "IDEMPOTENCY_KEY_REUSED"
+      is AlarmSchedulingRepositoryException.QrNotRegistered -> "QR_NOT_REGISTERED"
+      is AlarmSchedulingRepositoryException.AlreadyEnabled,
+      is AlarmSchedulingRepositoryException.ScheduleExpired,
+      is AlarmSchedulingRepositoryException.PendingOccurrenceExists,
+      -> "INVALID_STATE"
+      is CapabilityRequired -> "CAPABILITY_REQUIRED"
       is IllegalArgumentException ->
         if (error.message?.contains("lowercase UUID v4") == true) {
           "INVALID_ARGUMENT"
@@ -262,6 +336,7 @@ class MissionAlarmModule(
   }
 
   private class UnsupportedContractVersion : IllegalArgumentException()
+  private class CapabilityRequired : IllegalStateException()
 
   companion object {
     const val NAME = "NativeMissionAlarm"

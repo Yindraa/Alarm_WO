@@ -29,7 +29,7 @@ class MissionAlarmModuleTest {
     val application = ApplicationProvider.getApplicationContext<android.content.Context>()
     application.deleteDatabase(DATABASE_NAME)
     context = BridgeReactContext(application)
-    module = MissionAlarmModule(context)
+    module = MissionAlarmModule(context) { true }
   }
 
   @After
@@ -66,6 +66,49 @@ class MissionAlarmModuleTest {
 
     assertNull(rejected.value)
     assertEquals("IDEMPOTENCY_KEY_REUSED", rejected.error?.getString("code"))
+  }
+
+  @Test
+  fun enableThenQueryExposesPersistedPendingSchedule() {
+    val saved = invoke { promise -> module.saveAlarmConfiguration(draft(), promise) }
+    val alarmId = (saved.value as ReadableMap).getString("aggregateId")!!
+
+    val enabled = invoke { promise -> module.enableAlarm(enable(alarmId), promise) }
+
+    assertNull(enabled.error)
+    val ack = enabled.value as ReadableMap
+    assertEquals(2, ack.getInt("revision"))
+    assertEquals(alarmId, ack.getString("aggregateId"))
+    val queried = invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }
+    val alarm = (queried.value as ReadableMap).getMap("alarm")!!
+    assertTrue(alarm.getBoolean("enabled"))
+    assertEquals("PENDING", alarm.getString("scheduleHealth"))
+    assertTrue(alarm.hasKey("nextOccurrenceAtUtcMs") && !alarm.isNull("nextOccurrenceAtUtcMs"))
+  }
+
+  @Test
+  fun missingCriticalCapabilityRejectsEnableWithoutMutatingDraft() {
+    module.invalidate()
+    module = MissionAlarmModule(context) { false }
+    val saved = invoke { promise -> module.saveAlarmConfiguration(draft(), promise) }
+    val alarmId = (saved.value as ReadableMap).getString("aggregateId")!!
+
+    val rejected = invoke { promise -> module.enableAlarm(enable(alarmId), promise) }
+
+    assertEquals("CAPABILITY_REQUIRED", rejected.error?.getString("code"))
+    val queried = invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }
+    assertFalse((queried.value as ReadableMap).getMap("alarm")!!.getBoolean("enabled"))
+  }
+
+  @Test
+  fun malformedEnableInputIsRejectedBeforeCapabilityInspection() {
+    module.invalidate()
+    module = MissionAlarmModule(context) { false }
+    val input = enable("not-an-alarm-id")
+
+    val rejected = invoke { promise -> module.enableAlarm(input, promise) }
+
+    assertEquals("INVALID_ARGUMENT", rejected.error?.getString("code"))
   }
 
   private fun invoke(call: (PromiseImpl) -> Unit): PromiseResult {
@@ -106,10 +149,18 @@ class MissionAlarmModuleTest {
     putString("mathGeneratorVersion", "math-v1")
   }
 
+  private fun enable(alarmId: String) = Arguments.createMap().apply {
+    putInt("contractVersion", 1)
+    putString("commandId", ENABLE_COMMAND_ID)
+    putString("aggregateId", alarmId)
+    putInt("expectedRevision", 1)
+  }
+
   private data class PromiseResult(val value: Any?, val error: ReadableMap?)
 
   private companion object {
     const val DATABASE_NAME = "mission-alarm.db"
     const val COMMAND_ID = "126baf63-80fb-4449-89ac-37667b33ff44"
+    const val ENABLE_COMMAND_ID = "dc1457ab-ef8d-49c1-a67c-4cafc5063c22"
   }
 }

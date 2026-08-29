@@ -81,6 +81,13 @@ export type AlarmDraftInput = Readonly<{
   mathGeneratorVersion: string | null;
 }>;
 
+export type AggregateCommandMeta = Readonly<{
+  contractVersion: CodegenTypes.Int32;
+  commandId: string;
+  aggregateId: string;
+  expectedRevision: CodegenTypes.Int32;
+}>;
+
 export type CommandAck = Readonly<{
   commandId: string;
   aggregateType: string;
@@ -97,6 +104,7 @@ export interface Spec extends TurboModule {
     alarmId: string | null,
   ): Promise<AlarmEditorSnapshot>;
   saveAlarmConfiguration(input: AlarmDraftInput): Promise<CommandAck>;
+  enableAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeMissionAlarm');

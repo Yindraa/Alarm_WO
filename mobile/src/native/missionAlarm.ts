@@ -1,4 +1,5 @@
 import NativeMissionAlarm, {
+  type AggregateCommandMeta,
   type AlarmDraftInput,
   type AlarmEditorSnapshot,
   type CommandAck,
@@ -28,6 +29,22 @@ export async function saveAlarmConfiguration(
   validateDraft(draft);
   return NativeMissionAlarm.saveAlarmConfiguration({
     ...draft,
+    contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+  });
+}
+
+export type AlarmAggregateCommand = Omit<AggregateCommandMeta, 'contractVersion'>;
+
+export async function enableAlarm(
+  command: AlarmAggregateCommand,
+): Promise<CommandAck> {
+  requireUuid(command.commandId, 'commandId');
+  requireUuid(command.aggregateId, 'aggregateId');
+  if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
+    throw new Error('INVALID_ARGUMENT');
+  }
+  return NativeMissionAlarm.enableAlarm({
+    ...command,
     contractVersion: MISSION_ALARM_CONTRACT_VERSION,
   });
 }

@@ -1,5 +1,6 @@
 import NativeMissionAlarm from '../src/native/specs/NativeMissionAlarm';
 import {
+  enableAlarm,
   getAlarmEditorSnapshot,
   MISSION_ALARM_CONTRACT_VERSION,
   saveAlarmConfiguration,
@@ -12,6 +13,7 @@ jest.mock('../src/native/specs/NativeMissionAlarm', () => ({
     getContractInfo: jest.fn(),
     getAlarmEditorSnapshot: jest.fn(),
     saveAlarmConfiguration: jest.fn(),
+    enableAlarm: jest.fn(),
   },
 }));
 
@@ -89,6 +91,42 @@ describe('mission alarm native wrapper', () => {
       MISSION_ALARM_CONTRACT_VERSION,
       ALARM_ID,
     );
+  });
+
+  it('adds contract metadata before enabling an alarm', async () => {
+    native.enableAlarm.mockResolvedValue({
+      commandId: COMMAND_ID,
+      aggregateType: 'ALARM',
+      aggregateId: ALARM_ID,
+      revision: 2,
+      appliedAtMs: 1000,
+      replayed: false,
+    });
+
+    const result = await enableAlarm({
+      commandId: COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 1,
+    });
+
+    expect(result.revision).toBe(2);
+    expect(native.enableAlarm).toHaveBeenCalledWith({
+      contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+      commandId: COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 1,
+    });
+  });
+
+  it('rejects an invalid enable revision before calling native', async () => {
+    await expect(
+      enableAlarm({
+        commandId: COMMAND_ID,
+        aggregateId: ALARM_ID,
+        expectedRevision: 0,
+      }),
+    ).rejects.toThrow('INVALID_ARGUMENT');
+    expect(native.enableAlarm).not.toHaveBeenCalled();
   });
 });
 

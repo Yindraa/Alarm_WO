@@ -6,7 +6,8 @@
 
 ## Current slice
 
-The first M1 increment establishes the Kotlin domain model and the first Room V1 persistence slice.
+The current M1 increment establishes the Kotlin domain model, Room V1 persistence, and the first
+crash-safe alarm scheduling command slice.
 
 Implemented:
 
@@ -30,30 +31,39 @@ Implemented:
 - deterministic command/effect identity primitives and receipt-expiry cleanup;
 - transactional disabled-draft repository with canonical SHA-256 request hashing,
   seven-day receipts, replay acknowledgement, optimistic revision, and atomic rollback;
+- transactional `enableAlarm` repository workflow with fresh expected-revision enforcement,
+  current-timezone recurrence, stable occurrence identity, QR-readiness rejection, and expired
+  one-time rejection;
+- atomic alarm + `PENDING_OS` occurrence + `SCHEDULE_OCCURRENCE` +
+  `SYNC_DIRECT_BOOT_MIRROR` outbox + command-receipt commit before Android side effects;
 - outbox claim, owner-scoped acknowledgement, scheduled retry, and expired-lease reclaim;
 - unregistered QR configuration may persist only as a disabled draft and cannot be enabled;
 - exported Room schema committed for future migration verification;
 - exported-schema validation through the production Room builder;
 - required due-occurrence and due-effect indexes verified through `EXPLAIN QUERY PLAN`;
-- 15 deterministic JVM tests and 14 passing emulator instrumentation tests;
+- 15 deterministic JVM tests and 18 passing native-core emulator instrumentation tests;
 - JVM tests and Android-test APK compilation included in the standard Android verification command.
-- Codegen-verified `saveAlarmConfiguration` and `getAlarmEditorSnapshot` TurboModule methods;
+- Codegen-verified `saveAlarmConfiguration`, `enableAlarm`, and `getAlarmEditorSnapshot`
+  TurboModule methods;
 - allowlisted native DTO mapping, stable contract error codes, and fresh Android capability inspection;
-- persistent save-to-query bridge round-trip verified on an API 37 emulator.
+- exact-alarm capability blocks activation while notification/full-screen remain non-blocking fallback
+  capabilities and camera remains just-in-time for camera mission use;
+- persistent save/enable/query bridge round-trip verified on an API 37 emulator.
 
 ## Verification evidence
 
 - `:native-core:testDebugUnitTest` passes all 15 domain tests.
 - `:native-core:assembleDebugAndroidTest` compiles the instrumentation suite.
-- `:native-core:connectedDebugAndroidTest` passes 14 tests on the Android 37 `AlarmWO_API_37` emulator.
-- `:app:connectedDebugAndroidTest` passes 2 TurboModule persistence/error-contract tests on the same emulator.
-- JavaScript lint/typecheck and 5 Jest tests pass, including wrapper validation and contract-version injection.
+- `:native-core:connectedDebugAndroidTest` passes 18 tests on the Android 37 `AlarmWO_API_37` emulator.
+- `:app:connectedDebugAndroidTest` passes 5 TurboModule persistence/capability/error-contract tests on the same emulator.
+- JavaScript lint/typecheck and 7 Jest tests pass, including enable wrapper validation and
+  contract-version injection.
 - Room schema V1 is exported under `mobile/android/native-core/schemas`.
 
 ## Next increments
 
-1. Add repository support for enable/edit of enabled alarms, recurrence generation,
-   occurrence replacement, and scheduling/mirror effects in one transaction.
+1. Add repository support for edit of enabled alarms, disable/delete, occurrence replacement,
+   and cancellation effects in one transaction.
 2. Add bounded outbox failure classification and an Android effect-runner adapter.
 3. Add the device-protected boot mirror/journal after the canonical repository path is stable.
 4. Build the first Alarm Editor UI on the verified save/query contract.
