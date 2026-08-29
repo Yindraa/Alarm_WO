@@ -1,0 +1,30 @@
+apply plugin: "com.android.test"
+apply plugin: "org.jetbrains.kotlin.android"
+
+android {
+    namespace "com.missionalarm.benchmark"
+    compileSdk rootProject.ext.compileSdkVersion
+    targetProjectPath ":app"
+
+    defaultConfig {
+        minSdk 28
+        targetSdk rootProject.ext.targetSdkVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        benchmark {
+            debuggable true
+            matchingFallbacks = ["release"]
+        }
+    }
+
+    experimentalProperties["android.experimental.self-instrumenting"] = true
+}
+
+dependencies {
+    implementation "androidx.benchmark:benchmark-macro-junit4:1.4.1"
+    implementation "androidx.test.ext:junit:1.3.0"
+    implementation "androidx.test:runner:1.7.0"
+    implementation "androidx.test.uiautomator:uiautomator:2.4.0"
+}

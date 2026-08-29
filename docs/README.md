@@ -1,0 +1,33 @@
+# Mission Alarm Documentation
+
+Dokumentasi ini menjadi sumber acuan perancangan dan implementasi Mission Alarm.
+
+## Status fase
+
+| Fase | Status | Dokumen utama |
+|---|---|---|
+| 1. Scope & Product Decisions | Accepted | [`product/MVP_SCOPE.md`](product/MVP_SCOPE.md) |
+| 2. Technical Feasibility | Conditional Pass — physical-device gates carried forward | [`feasibility/TECHNICAL_FEASIBILITY.md`](feasibility/TECHNICAL_FEASIBILITY.md) |
+| 3. Technical Requirements | Accepted | [`requirements/TECHNICAL_REQUIREMENTS.md`](requirements/TECHNICAL_REQUIREMENTS.md) |
+| 4. System Architecture | Accepted | [`architecture/SYSTEM_ARCHITECTURE.md`](architecture/SYSTEM_ARCHITECTURE.md) |
+| 5. Computer Vision Specification | Specification Accepted — model qualification pending | [`cv/COMPUTER_VISION_SPECIFICATION.md`](cv/COMPUTER_VISION_SPECIFICATION.md) |
+| 6. Database & Contracts | Accepted | [`data/DATABASE_DESIGN.md`](data/DATABASE_DESIGN.md), [`api/API_CONTRACT.md`](api/API_CONTRACT.md) |
+| 7. UI/UX | Accepted | [`ux/UI_UX_SPECIFICATION.md`](ux/UI_UX_SPECIFICATION.md) |
+| 8. Testing Strategy | Accepted | [`testing/TESTING_STRATEGY.md`](testing/TESTING_STRATEGY.md) |
+| 9. Implementation Roadmap | Accepted — implementation M0 started | [`roadmap/IMPLEMENTATION_ROADMAP.md`](roadmap/IMPLEMENTATION_ROADMAP.md) |
+
+## Implementasi aktif
+
+| Milestone | Status | Evidence |
+|---|---|---|
+| M0 — Delivery readiness | In Progress — local engineering foundation green; external ownership decisions pending | [`implementation/M0_DELIVERY_READINESS.md`](implementation/M0_DELIVERY_READINESS.md) |
+
+- Requirement/test traceability: [`traceability/REQUIREMENT_TEST_REGISTRY.md`](traceability/REQUIREMENT_TEST_REGISTRY.md)
+- License and asset metadata: [`governance/LICENSE_REGISTRY.md`](governance/LICENSE_REGISTRY.md)
+
+## Sumber
+
+- Mission Alarm PRD v1.0 — Draft / Planning
+- Mission Alarm BRS v1.0 — Draft / Planning
+
+Dokumen sumber berada di luar repository. Isi repository ini merupakan hasil normalisasi dan keputusan turunan, bukan pengganti arsip asli.
