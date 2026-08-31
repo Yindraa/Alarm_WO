@@ -62,6 +62,46 @@ export type AlarmEditorSnapshot = Readonly<{
   availableMathGeneratorVersion: string;
 }>;
 
+export type AlarmListItem = Readonly<{
+  id: string;
+  revision: CodegenTypes.Int32;
+  label: string;
+  enabled: boolean;
+  localTimeMinutes: CodegenTypes.Int32;
+  repeatDaysMask: CodegenTypes.Int32;
+  missionType: string;
+  target: CodegenTypes.Int32;
+  nextOccurrenceAtUtcMs: CodegenTypes.Double | null;
+  scheduleHealth: string;
+}>;
+
+export type ActiveSummary = Readonly<{
+  instanceId: string;
+  revision: CodegenTypes.Int32;
+  state: string;
+  missionType: string;
+  target: CodegenTypes.Int32;
+  committedProgress: CodegenTypes.Int32;
+  queuedCount: CodegenTypes.Int32;
+}>;
+
+export type HistorySummary = Readonly<{
+  instanceId: string;
+  endedAtMs: CodegenTypes.Double;
+  scheduledAtUtcMs: CodegenTypes.Double;
+  missionType: string;
+  target: CodegenTypes.Int32;
+  finalProgress: CodegenTypes.Int32;
+  result: string;
+}>;
+
+export type HomeSnapshot = Readonly<{
+  generatedAtMs: CodegenTypes.Double;
+  alarms: ReadonlyArray<AlarmListItem>;
+  active: ActiveSummary | null;
+  recentHistory: ReadonlyArray<HistorySummary>;
+}>;
+
 export type AlarmDraftInput = Readonly<{
   contractVersion: CodegenTypes.Int32;
   commandId: string;
@@ -97,14 +137,63 @@ export type CommandAck = Readonly<{
   replayed: boolean;
 }>;
 
+export type MathQuestionView = Readonly<{
+  ordinal: CodegenTypes.Int32;
+  total: CodegenTypes.Int32;
+  operation: string;
+  operandA: CodegenTypes.Int32;
+  operandB: CodegenTypes.Int32;
+}>;
+
+export type ActiveRuntimeSnapshot = Readonly<{
+  generatedAtMs: CodegenTypes.Double;
+  found: boolean;
+  instanceId: string | null;
+  revision: CodegenTypes.Int32 | null;
+  runtimeState: string | null;
+  scheduledAtUtcMs: CodegenTypes.Double | null;
+  actualTriggerAtMs: CodegenTypes.Double | null;
+  missionType: string | null;
+  target: CodegenTypes.Int32 | null;
+  committedProgress: CodegenTypes.Int32 | null;
+  feedbackCode: string | null;
+  recoveryReasonCode: string | null;
+  mathQuestion: MathQuestionView | null;
+  queuedCount: CodegenTypes.Int32;
+  terminalResult: string | null;
+}>;
+
+export type NativeLaunchRequest = Readonly<{
+  contractVersion: CodegenTypes.Int32;
+  requestId: string;
+  aggregateId: string;
+  expectedRevision: CodegenTypes.Int32;
+}>;
+
+export type LaunchAck = Readonly<{
+  requestId: string;
+  sessionId: string;
+  launched: boolean;
+  launchType: string;
+}>;
+
 export interface Spec extends TurboModule {
   getContractInfo(): Promise<ContractInfo>;
+  getHomeSnapshot(
+    contractVersion: CodegenTypes.Int32,
+  ): Promise<HomeSnapshot>;
   getAlarmEditorSnapshot(
     contractVersion: CodegenTypes.Int32,
     alarmId: string | null,
   ): Promise<AlarmEditorSnapshot>;
+  getActiveRuntimeSnapshot(
+    contractVersion: CodegenTypes.Int32,
+  ): Promise<ActiveRuntimeSnapshot>;
   saveAlarmConfiguration(input: AlarmDraftInput): Promise<CommandAck>;
   enableAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
+  disableAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
+  deleteAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
+  launchActiveInstance(input: NativeLaunchRequest): Promise<LaunchAck>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('NativeMissionAlarm');

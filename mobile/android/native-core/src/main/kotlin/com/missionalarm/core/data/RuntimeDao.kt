@@ -17,11 +17,223 @@ abstract class RuntimeDao {
   @Insert(onConflict = OnConflictStrategy.ABORT)
   protected abstract fun insertMission(mission: InstanceMissionEntity)
 
+  @Insert(onConflict = OnConflictStrategy.ABORT)
+  abstract fun insertHistory(history: AlarmHistoryEntity)
+
+  @Insert(onConflict = OnConflictStrategy.ABORT)
+  abstract fun insertMathQuestions(questions: List<MathQuestionEntity>)
+
   @Query("SELECT * FROM alarm_instance WHERE occurrence_id = :occurrenceId")
   abstract fun findInstanceByOccurrence(occurrenceId: String): AlarmInstanceEntity?
 
+  @Query("SELECT * FROM alarm_instance WHERE id = :instanceId")
+  abstract fun findInstanceById(instanceId: String): AlarmInstanceEntity?
+
+  @Query("SELECT * FROM alarm_history WHERE instance_id = :instanceId")
+  abstract fun findHistoryByInstanceId(instanceId: String): AlarmHistoryEntity?
+
+  @Query(
+    """
+    SELECT * FROM alarm_history
+    ORDER BY ended_at_ms DESC, instance_id DESC
+    LIMIT :limit
+    """,
+  )
+  abstract fun findRecentHistory(limit: Int): List<AlarmHistoryEntity>
+
   @Query("SELECT * FROM instance_mission WHERE instance_id = :instanceId")
   abstract fun findMission(instanceId: String): InstanceMissionEntity?
+
+  @Query(
+    """
+    SELECT ordinal, operation, operand_a, operand_b
+    FROM math_question
+    WHERE instance_id = :instanceId AND answered = 0
+    ORDER BY ordinal
+    LIMIT 1
+    """,
+  )
+  abstract fun findCurrentMathQuestion(instanceId: String): MathQuestionPrompt?
+
+  @Query(
+    """
+    SELECT COUNT(*) FROM alarm_instance
+    WHERE runtime_state = 'PENDING_ATTENTION' AND attention_slot IS NULL
+    """,
+  )
+  abstract fun countQueuedInstances(): Int
+
+  @Query(
+    """
+    SELECT * FROM alarm_instance
+    WHERE runtime_state = 'PENDING_ATTENTION' AND attention_slot IS NULL
+    ORDER BY queue_order, scheduled_at_utc_ms, created_at_ms, id
+    LIMIT 1
+    """,
+  )
+  abstract fun findOldestQueuedInstance(): AlarmInstanceEntity?
+
+  @Query(
+    """
+    UPDATE alarm_instance
+    SET revision = revision + 1, runtime_state = 'TERMINAL', attention_slot = NULL,
+      terminal_at_ms = :terminalAtMs, terminal_result = 'EMERGENCY_DISMISSED',
+      dismiss_method = 'EMERGENCY_HOLD', error_reason_code = NULL, updated_at_ms = :terminalAtMs
+    WHERE id = :instanceId AND revision = :expectedRevision AND attention_slot = 1
+      AND runtime_state IN ('TRIGGERED', 'MISSION_LOCKED', 'MISSION_IN_PROGRESS', 'RECOVERY_REQUIRED')
+    """,
+  )
+  abstract fun markEmergencyDismissed(
+    instanceId: String,
+    expectedRevision: Int,
+    terminalAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE alarm_instance
+    SET revision = revision + 1, runtime_state = 'TRIGGERED', attention_slot = 1,
+      updated_at_ms = :updatedAtMs
+    WHERE id = :instanceId AND revision = :expectedRevision
+      AND runtime_state = 'PENDING_ATTENTION' AND attention_slot IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM alarm_instance
+        WHERE attention_slot = 1 AND runtime_state <> 'TERMINAL'
+      )
+    """,
+  )
+  abstract fun promoteQueuedInstance(
+    instanceId: String,
+    expectedRevision: Int,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query("SELECT * FROM alarm_occurrence WHERE id = :occurrenceId")
+  abstract fun findOccurrenceById(occurrenceId: String): AlarmOccurrenceEntity?
+
+  @Query("SELECT COALESCE(MAX(queue_order), 0) + 1 FROM alarm_instance")
+  abstract fun nextQueueOrder(): Long
+
+  @Query(
+    """
+    SELECT COUNT(*) FROM alarm_instance
+    WHERE attention_slot = 1 AND runtime_state <> 'TERMINAL'
+    """,
+  )
+  abstract fun countAttendedInstances(): Int
+
+  @Query(
+    """
+    SELECT * FROM alarm_instance
+    WHERE attention_slot = 1 AND runtime_state <> 'TERMINAL'
+    LIMIT 1
+    """,
+  )
+  abstract fun findAttendedInstance(): AlarmInstanceEntity?
+
+  @Transaction
+  open fun loadActiveRuntimeSnapshot(): ActiveRuntimeSnapshot? {
+    val instance = findAttendedInstance() ?: return null
+    val mission = checkNotNull(findMission(instance.id)) { "active instance mission is missing" }
+    return ActiveRuntimeSnapshot(
+      instanceId = instance.id,
+      revision = instance.revision,
+      runtimeState = instance.runtimeState,
+      label = instance.labelSnapshot,
+      occurrenceId = instance.occurrenceId,
+      scheduledAtUtcMs = instance.scheduledAtUtcMs,
+      actualTriggerAtMs = instance.actualTriggerAtMs,
+      missionType = mission.missionType,
+      target = mission.target,
+      committedProgress = mission.committedProgress,
+      missionRuntimeStatus = mission.runtimeStatus,
+      mathQuestion = if (mission.missionType == "MATH") {
+        findCurrentMathQuestion(instance.id)
+      } else {
+        null
+      },
+      queuedCount = countQueuedInstances(),
+    )
+  }
+
+  @Query(
+    """
+    SELECT * FROM alarm_occurrence
+    WHERE alarm_id = :alarmId AND state IN ('PENDING_OS', 'SCHEDULED_OS')
+    ORDER BY scheduled_at_utc_ms, id
+    """,
+  )
+  abstract fun findSchedulableOccurrences(alarmId: String): List<AlarmOccurrenceEntity>
+
+  @Query(
+    """
+    UPDATE alarm_occurrence
+    SET state = 'CANCELLED', last_error_code = NULL, updated_at_ms = :updatedAtMs
+    WHERE id = :occurrenceId AND state IN ('PENDING_OS', 'SCHEDULED_OS')
+    """,
+  )
+  abstract fun markOccurrenceCancelled(occurrenceId: String, updatedAtMs: Long): Int
+
+  @Query(
+    """
+    SELECT COUNT(*) FROM alarm_instance
+    WHERE alarm_id = :alarmId AND runtime_state <> 'TERMINAL'
+    """,
+  )
+  abstract fun countNonTerminalInstances(alarmId: String): Int
+
+  @Query(
+    """
+    UPDATE alarm_instance
+    SET alarm_id = NULL, revision = revision + 1, updated_at_ms = :updatedAtMs
+    WHERE alarm_id = :alarmId AND runtime_state = 'TERMINAL'
+    """,
+  )
+  abstract fun detachTerminalInstancesFromAlarm(alarmId: String, updatedAtMs: Long): Int
+
+  @Query(
+    """
+    UPDATE alarm_occurrence
+    SET alarm_id = NULL, updated_at_ms = :updatedAtMs
+    WHERE alarm_id = :alarmId
+    """,
+  )
+  abstract fun detachOccurrencesFromAlarm(alarmId: String, updatedAtMs: Long): Int
+
+  @Query(
+    """
+    UPDATE alarm_occurrence
+    SET state = 'SCHEDULED_OS', last_error_code = NULL, updated_at_ms = :updatedAtMs
+    WHERE id = :occurrenceId AND state IN ('PENDING_OS', 'SCHEDULED_OS')
+    """,
+  )
+  abstract fun markOccurrenceScheduled(occurrenceId: String, updatedAtMs: Long): Int
+
+  @Query(
+    """
+    UPDATE alarm_occurrence
+    SET last_error_code = :errorCode, updated_at_ms = :updatedAtMs
+    WHERE id = :occurrenceId AND state = 'PENDING_OS'
+    """,
+  )
+  abstract fun markOccurrenceSchedulingError(
+    occurrenceId: String,
+    errorCode: String,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE alarm_occurrence
+    SET state = 'FAILED', last_error_code = :errorCode, updated_at_ms = :updatedAtMs
+    WHERE id = :occurrenceId AND state IN ('PENDING_OS', 'SCHEDULED_OS')
+    """,
+  )
+  abstract fun markOccurrenceSchedulingFailed(
+    occurrenceId: String,
+    errorCode: String,
+    updatedAtMs: Long,
+  ): Int
 
   @Query(
     """
@@ -69,6 +281,29 @@ abstract class RuntimeDao {
   abstract fun findNextOccurrence(alarmId: String): AlarmOccurrenceEntity?
 }
 
+data class MathQuestionPrompt(
+  val ordinal: Int,
+  val operation: String,
+  @androidx.room.ColumnInfo(name = "operand_a") val operandA: Int,
+  @androidx.room.ColumnInfo(name = "operand_b") val operandB: Int,
+)
+
+data class ActiveRuntimeSnapshot(
+  val instanceId: String,
+  val occurrenceId: String,
+  val revision: Int,
+  val runtimeState: String,
+  val label: String,
+  val scheduledAtUtcMs: Long,
+  val actualTriggerAtMs: Long?,
+  val missionType: String,
+  val target: Int,
+  val committedProgress: Int,
+  val missionRuntimeStatus: String,
+  val mathQuestion: MathQuestionPrompt?,
+  val queuedCount: Int,
+)
+
 @Dao
 abstract class ReliabilityDao {
   @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -79,6 +314,14 @@ abstract class ReliabilityDao {
 
   @Query("SELECT * FROM runtime_effect WHERE id = :effectId")
   abstract fun findEffectById(effectId: String): RuntimeEffectEntity?
+
+  @Query(
+    """
+    SELECT COUNT(*) FROM runtime_effect
+    WHERE effect_type = :effectType AND status <> 'ACKNOWLEDGED'
+    """,
+  )
+  abstract fun countUnacknowledgedEffects(effectType: String): Int
 
   @Insert(onConflict = OnConflictStrategy.IGNORE)
   abstract fun insertReceipt(receipt: CommandReceiptEntity): Long
@@ -104,6 +347,19 @@ abstract class ReliabilityDao {
 
   @Query(
     """
+    SELECT id FROM runtime_effect
+    WHERE effect_type = :effectType AND (
+      (status IN ('PENDING', 'RETRYABLE') AND (next_attempt_at_ms IS NULL OR next_attempt_at_ms <= :nowMs))
+      OR (status = 'LEASED' AND lease_until_ms <= :nowMs)
+    )
+    ORDER BY created_at_ms, id
+    LIMIT 1
+    """,
+  )
+  protected abstract fun findClaimCandidateId(effectType: String, nowMs: Long): String?
+
+  @Query(
+    """
     UPDATE runtime_effect
     SET status = 'LEASED', lease_owner = :owner, lease_until_ms = :leaseUntilMs,
       attempt_count = attempt_count + 1, updated_at_ms = :nowMs
@@ -120,6 +376,25 @@ abstract class ReliabilityDao {
     leaseUntilMs: Long,
   ): Int
 
+  @Query(
+    """
+    UPDATE runtime_effect
+    SET status = 'LEASED', lease_owner = :owner, lease_until_ms = :leaseUntilMs,
+      attempt_count = attempt_count + 1, updated_at_ms = :nowMs
+    WHERE id = :effectId AND effect_type = :effectType AND (
+      (status IN ('PENDING', 'RETRYABLE') AND (next_attempt_at_ms IS NULL OR next_attempt_at_ms <= :nowMs))
+      OR (status = 'LEASED' AND lease_until_ms <= :nowMs)
+    )
+    """,
+  )
+  protected abstract fun acquireLease(
+    effectId: String,
+    effectType: String,
+    owner: String,
+    nowMs: Long,
+    leaseUntilMs: Long,
+  ): Int
+
   @Transaction
   open fun claimNext(owner: String, nowMs: Long, leaseDurationMs: Long): RuntimeEffectEntity? {
     require(owner.isNotBlank()) { "lease owner must not be blank" }
@@ -129,6 +404,26 @@ abstract class ReliabilityDao {
     val effectId = findClaimCandidateId(nowMs) ?: return null
     val leaseUntilMs = nowMs + leaseDurationMs
     check(acquireLease(effectId, owner, nowMs, leaseUntilMs) == 1) { "effect lease race" }
+    return checkNotNull(findEffectById(effectId))
+  }
+
+  @Transaction
+  open fun claimNext(
+    effectType: String,
+    owner: String,
+    nowMs: Long,
+    leaseDurationMs: Long,
+  ): RuntimeEffectEntity? {
+    require(effectType.isNotBlank()) { "effect type must not be blank" }
+    require(owner.isNotBlank()) { "lease owner must not be blank" }
+    require(leaseDurationMs > 0 && nowMs <= Long.MAX_VALUE - leaseDurationMs) {
+      "lease duration must be positive and bounded"
+    }
+    val effectId = findClaimCandidateId(effectType, nowMs) ?: return null
+    val leaseUntilMs = nowMs + leaseDurationMs
+    check(acquireLease(effectId, effectType, owner, nowMs, leaseUntilMs) == 1) {
+      "effect lease race"
+    }
     return checkNotNull(findEffectById(effectId))
   }
 
@@ -155,6 +450,36 @@ abstract class ReliabilityDao {
     effectId: String,
     owner: String,
     nextAttemptAtMs: Long,
+    errorCode: String,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE runtime_effect
+    SET status = 'BLOCKED_CAPABILITY', lease_owner = NULL, lease_until_ms = NULL,
+      next_attempt_at_ms = NULL, last_error_code = :errorCode, updated_at_ms = :updatedAtMs
+    WHERE id = :effectId AND status = 'LEASED' AND lease_owner = :owner
+    """,
+  )
+  abstract fun blockCapability(
+    effectId: String,
+    owner: String,
+    errorCode: String,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE runtime_effect
+    SET status = 'DEAD_LETTER', lease_owner = NULL, lease_until_ms = NULL,
+      next_attempt_at_ms = NULL, last_error_code = :errorCode, updated_at_ms = :updatedAtMs
+    WHERE id = :effectId AND status = 'LEASED' AND lease_owner = :owner
+    """,
+  )
+  abstract fun deadLetter(
+    effectId: String,
+    owner: String,
     errorCode: String,
     updatedAtMs: Long,
   ): Int

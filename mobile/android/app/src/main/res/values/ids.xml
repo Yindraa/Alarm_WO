@@ -1,0 +1,11 @@
+<resources>
+    <item name="alarm_host_loading" type="id" />
+    <item name="alarm_host_time" type="id" />
+    <item name="alarm_host_title" type="id" />
+    <item name="alarm_host_detail" type="id" />
+    <item name="alarm_host_progress" type="id" />
+    <item name="alarm_host_queue" type="id" />
+    <item name="alarm_host_primary_action" type="id" />
+    <item name="alarm_host_recovery_status" type="id" />
+    <item name="alarm_host_emergency_action" type="id" />
+</resources>

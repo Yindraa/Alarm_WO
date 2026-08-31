@@ -16,19 +16,38 @@ import com.missionalarm.core.data.AlarmDraftRepositoryException
 import com.missionalarm.core.data.AlarmIdGenerator
 import com.missionalarm.core.data.AlarmSchedulingRepository
 import com.missionalarm.core.data.AlarmSchedulingRepositoryException
+import com.missionalarm.core.data.AlarmRuntimeStarter
+import com.missionalarm.core.data.AlarmRuntimeStopper
+import com.missionalarm.core.data.AlarmHostPresenter
+import com.missionalarm.core.data.AlarmHistoryEntity
 import com.missionalarm.core.data.AlarmWithMission
+import com.missionalarm.core.data.ActiveRuntimeSnapshot
 import com.missionalarm.core.data.CurrentZoneProvider
+import com.missionalarm.core.data.DirectBootDatabaseFactory
+import com.missionalarm.core.data.DirectBootMirrorEffectRunner
+import com.missionalarm.core.data.DirectBootMirrorStore
 import com.missionalarm.core.data.EffectIdGenerator
 import com.missionalarm.core.data.EnableAlarmCommand
+import com.missionalarm.core.data.ExactAlarmScheduler
+import com.missionalarm.core.data.LeaseOwnerGenerator
 import com.missionalarm.core.data.MissionAlarmDatabaseFactory
 import com.missionalarm.core.data.OccurrenceIdGenerator
+import com.missionalarm.core.data.PresentationEffectRunner
+import com.missionalarm.core.data.RoomDirectBootMirrorStore
+import com.missionalarm.core.data.RuntimeEffectRunner
+import com.missionalarm.core.data.RuntimeStopEffectRunner
 import com.missionalarm.core.data.SaveAlarmDraftCommand
+import com.missionalarm.core.data.SchedulingEffectRunner
 import com.missionalarm.core.domain.AlarmId
 import com.missionalarm.core.domain.CommandId
 import com.missionalarm.core.domain.MissionType
 import com.missionalarm.core.domain.OccurrenceId
 import com.missionalarm.core.domain.Revision
 import com.missionalarm.specs.NativeMissionAlarmSpec
+import com.missionalarm.scheduling.AndroidExactAlarmScheduler
+import com.missionalarm.runtime.AndroidAlarmRuntimeStarter
+import com.missionalarm.runtime.AndroidAlarmHostPresenter
+import com.missionalarm.runtime.AndroidAlarmRuntimeStopper
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -36,7 +55,13 @@ import java.util.concurrent.Executors
 class MissionAlarmModule(
   private val reactContext: ReactApplicationContext,
   private val criticalSchedulingCapabilityOverride: (() -> Boolean)? = null,
+  private val exactAlarmSchedulerOverride: ExactAlarmScheduler? = null,
+  private val directBootMirrorStoreOverride: DirectBootMirrorStore? = null,
+  private val alarmRuntimeStarterOverride: AlarmRuntimeStarter? = null,
+  private val alarmHostPresenterOverride: AlarmHostPresenter? = null,
+  private val alarmRuntimeStopperOverride: AlarmRuntimeStopper? = null,
 ) : NativeMissionAlarmSpec(reactContext) {
+  private val launchReceipts = mutableMapOf<String, LaunchReceipt>()
   private val executor = Executors.newSingleThreadExecutor { runnable ->
     Thread(runnable, "mission-alarm-native").apply { isDaemon = true }
   }
@@ -61,9 +86,62 @@ class MissionAlarmModule(
       effectIdGenerator = EffectIdGenerator { UUID.randomUUID().toString() },
     )
   }
+  private val scheduleEffectRunnerDelegate = lazy {
+    SchedulingEffectRunner(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      leaseOwnerGenerator = LeaseOwnerGenerator { UUID.randomUUID().toString() },
+      scheduler = exactAlarmSchedulerOverride
+        ?: AndroidExactAlarmScheduler(reactContext.applicationContext),
+    )
+  }
+  private val directBootDatabaseDelegate = lazy {
+    DirectBootDatabaseFactory.persistent(reactContext.applicationContext)
+  }
+  private val mirrorEffectRunnerDelegate = lazy {
+    DirectBootMirrorEffectRunner(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      leaseOwnerGenerator = LeaseOwnerGenerator { UUID.randomUUID().toString() },
+      mirrorStore = directBootMirrorStoreOverride
+        ?: RoomDirectBootMirrorStore(directBootDatabaseDelegate.value),
+    )
+  }
+  private val runtimeEffectRunnerDelegate = lazy {
+    RuntimeEffectRunner(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      leaseOwnerGenerator = LeaseOwnerGenerator { UUID.randomUUID().toString() },
+      runtimeStarter = alarmRuntimeStarterOverride
+        ?: AndroidAlarmRuntimeStarter(reactContext.applicationContext),
+    )
+  }
+  private val presentationEffectRunnerDelegate = lazy {
+    PresentationEffectRunner(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      leaseOwnerGenerator = LeaseOwnerGenerator { UUID.randomUUID().toString() },
+      presenter = alarmHostPresenterOverride
+        ?: AndroidAlarmHostPresenter(reactContext.applicationContext),
+    )
+  }
+  private val runtimeStopEffectRunnerDelegate = lazy {
+    RuntimeStopEffectRunner(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      leaseOwnerGenerator = LeaseOwnerGenerator { UUID.randomUUID().toString() },
+      runtimeStopper = alarmRuntimeStopperOverride
+        ?: AndroidAlarmRuntimeStopper(reactContext.applicationContext),
+    )
+  }
   private val database by databaseDelegate
   private val repository by repositoryDelegate
   private val schedulingRepository by schedulingRepositoryDelegate
+  private val scheduleEffectRunner by scheduleEffectRunnerDelegate
+  private val mirrorEffectRunner by mirrorEffectRunnerDelegate
+  private val runtimeEffectRunner by runtimeEffectRunnerDelegate
+  private val presentationEffectRunner by presentationEffectRunnerDelegate
+  private val runtimeStopEffectRunner by runtimeStopEffectRunnerDelegate
 
   override fun getName(): String = NAME
 
@@ -99,7 +177,13 @@ class MissionAlarmModule(
           mathOperationsMask = input.nullableInt("mathOperationsMask"),
           mathGeneratorVersion = input.nullableString("mathGeneratorVersion"),
         )
-        val ack = repository.save(command)
+        val ack = try {
+          repository.save(command)
+        } catch (_: AlarmDraftRepositoryException.EnabledEditUnsupported) {
+          if (!hasCriticalSchedulingCapability()) throw CapabilityRequired()
+          schedulingRepository.editEnabled(command)
+        }
+        drainReliabilityEffects()
         promise.resolve(
           Arguments.createMap().apply {
             putString("commandId", ack.commandId)
@@ -127,6 +211,33 @@ class MissionAlarmModule(
         )
         if (!hasCriticalSchedulingCapability()) throw CapabilityRequired()
         val ack = schedulingRepository.enable(command)
+        drainReliabilityEffects()
+        promise.resolve(commandAck(ack.commandId, ack.alarmId, ack.revision, ack.appliedAtMs, ack.replayed))
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
+  override fun disableAlarm(input: ReadableMap, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(input.requiredInt("contractVersion"))
+        val ack = schedulingRepository.disable(input.toAlarmAggregateCommand())
+        drainReliabilityEffects()
+        promise.resolve(commandAck(ack.commandId, ack.alarmId, ack.revision, ack.appliedAtMs, ack.replayed))
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
+  override fun deleteAlarm(input: ReadableMap, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(input.requiredInt("contractVersion"))
+        val ack = schedulingRepository.delete(input.toAlarmAggregateCommand())
+        drainReliabilityEffects()
         promise.resolve(commandAck(ack.commandId, ack.alarmId, ack.revision, ack.appliedAtMs, ack.replayed))
       } catch (error: Throwable) {
         rejectMapped(promise, error)
@@ -143,6 +254,7 @@ class MissionAlarmModule(
       try {
         requireContractVersion(contractVersion.toContractInt())
         val parsedAlarmId = alarmId?.let(AlarmId::parse)
+        drainReliabilityEffects()
         val stored = parsedAlarmId?.let(repository::find)
         if (parsedAlarmId != null && stored == null) throw AlarmDraftRepositoryException.NotFound()
         promise.resolve(editorSnapshot(stored))
@@ -152,10 +264,82 @@ class MissionAlarmModule(
     }
   }
 
+  override fun getHomeSnapshot(contractVersion: Double, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(contractVersion.toContractInt())
+        val snapshot = database.runInTransaction<com.facebook.react.bridge.WritableMap> {
+          homeSnapshot(
+            database.alarmDao().findHomeAlarms(),
+            database.runtimeDao().loadActiveRuntimeSnapshot(),
+            database.runtimeDao().findRecentHistory(HOME_HISTORY_LIMIT),
+          )
+        }
+        promise.resolve(snapshot)
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
+  override fun getActiveRuntimeSnapshot(contractVersion: Double, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(contractVersion.toContractInt())
+        promise.resolve(activeRuntimeSnapshot(database.runtimeDao().loadActiveRuntimeSnapshot()))
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
+  override fun launchActiveInstance(input: ReadableMap, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(input.requiredInt("contractVersion"))
+        val requestId = input.requiredString("requestId").also(UUID::fromString)
+        val instanceId = input.requiredString("aggregateId").also(UUID::fromString)
+        val expectedRevision = input.requiredInt("expectedRevision").also { require(it >= 1) }
+        launchReceipts[requestId]?.let { receipt ->
+          if (receipt.instanceId != instanceId || receipt.expectedRevision != expectedRevision) {
+            throw LaunchRequestReused()
+          }
+          promise.resolve(launchAck(receipt))
+          return@execute
+        }
+        val active = database.runtimeDao().loadActiveRuntimeSnapshot()
+          ?: throw ActiveInstanceNotFound()
+        if (active.instanceId != instanceId) throw ActiveInstanceNotFound()
+        if (active.revision != expectedRevision) throw ActiveInstanceRevisionConflict()
+        (alarmHostPresenterOverride ?: AndroidAlarmHostPresenter(reactContext.applicationContext))
+          .present(active.instanceId)
+        val receipt = LaunchReceipt(
+          requestId,
+          instanceId,
+          expectedRevision,
+          UUID.randomUUID().toString(),
+        )
+        launchReceipts[requestId] = receipt
+        promise.resolve(launchAck(receipt))
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
   override fun invalidate() {
     executor.shutdown()
+    if (directBootDatabaseDelegate.isInitialized()) directBootDatabaseDelegate.value.close()
     if (databaseDelegate.isInitialized()) database.close()
     super.invalidate()
+  }
+
+  private fun drainReliabilityEffects() {
+    runCatching { runtimeStopEffectRunner.drain() }
+    runCatching { runtimeEffectRunner.drain() }
+    runCatching { presentationEffectRunner.drain() }
+    runCatching { scheduleEffectRunner.drain() }
+    runCatching { mirrorEffectRunner.drain() }
   }
 
   private fun editorSnapshot(stored: AlarmWithMission?) = Arguments.createMap().apply {
@@ -165,6 +349,99 @@ class MissionAlarmModule(
     putMap("capabilities", capabilitySnapshot())
     putString("availablePushupProfileVersion", PUSHUP_PROFILE_VERSION)
     putString("availableMathGeneratorVersion", MATH_GENERATOR_VERSION)
+  }
+
+  private fun activeRuntimeSnapshot(snapshot: ActiveRuntimeSnapshot?) = Arguments.createMap().apply {
+    putDouble("generatedAtMs", System.currentTimeMillis().toDouble())
+    putBoolean("found", snapshot != null)
+    putNullableString("instanceId", snapshot?.instanceId)
+    putNullableInt("revision", snapshot?.revision)
+    putNullableString("runtimeState", snapshot?.runtimeState)
+    putNullableDouble("scheduledAtUtcMs", snapshot?.scheduledAtUtcMs)
+    putNullableDouble("actualTriggerAtMs", snapshot?.actualTriggerAtMs)
+    putNullableString("missionType", snapshot?.missionType)
+    putNullableInt("target", snapshot?.target)
+    putNullableInt("committedProgress", snapshot?.committedProgress)
+    putNull("feedbackCode")
+    putNullableString(
+      "recoveryReasonCode",
+      if (snapshot?.runtimeState == "RECOVERY_REQUIRED" ||
+        snapshot?.missionRuntimeStatus == "RECOVERY_REQUIRED"
+      ) "MISSION_RECOVERY_REQUIRED" else null,
+    )
+    val mathQuestion = snapshot?.mathQuestion
+    if (mathQuestion == null) {
+      putNull("mathQuestion")
+    } else {
+      putMap("mathQuestion", Arguments.createMap().apply {
+        putInt("ordinal", mathQuestion.ordinal)
+        putInt("total", snapshot.target)
+        putString("operation", mathQuestion.operation)
+        putInt("operandA", mathQuestion.operandA)
+        putInt("operandB", mathQuestion.operandB)
+      })
+    }
+    putInt("queuedCount", snapshot?.queuedCount ?: 0)
+    putNull("terminalResult")
+  }
+
+  private fun homeSnapshot(
+    alarms: List<AlarmWithMission>,
+    active: ActiveRuntimeSnapshot?,
+    history: List<AlarmHistoryEntity>,
+  ) = Arguments.createMap().apply {
+    putDouble("generatedAtMs", System.currentTimeMillis().toDouble())
+    putArray("alarms", Arguments.createArray().apply {
+      alarms.forEach { pushMap(alarmListItem(it)) }
+    })
+    if (active == null) {
+      putNull("active")
+    } else {
+      putMap("active", Arguments.createMap().apply {
+        putString("instanceId", active.instanceId)
+        putInt("revision", active.revision)
+        putString("state", active.runtimeState)
+        putString("missionType", active.missionType)
+        putInt("target", active.target)
+        putInt("committedProgress", active.committedProgress)
+        putInt("queuedCount", active.queuedCount)
+      })
+    }
+    putArray("recentHistory", Arguments.createArray().apply {
+      history.forEach { item ->
+        pushMap(Arguments.createMap().apply {
+          putString("instanceId", item.instanceId)
+          putDouble("endedAtMs", item.endedAtMs.toDouble())
+          putDouble("scheduledAtUtcMs", item.scheduledAtUtcMs.toDouble())
+          putString("missionType", item.missionType)
+          putInt("target", item.target)
+          putInt("finalProgress", item.finalProgress)
+          putString("result", item.result)
+        })
+      }
+    })
+  }
+
+  private fun alarmListItem(stored: AlarmWithMission) = Arguments.createMap().apply {
+    val alarm = stored.alarm
+    val occurrence = database.runtimeDao().findNextOccurrence(alarm.id)
+    putString("id", alarm.id)
+    putInt("revision", alarm.revision)
+    putString("label", alarm.label)
+    putBoolean("enabled", alarm.enabled)
+    putInt("localTimeMinutes", alarm.localTimeMinutes)
+    putInt("repeatDaysMask", alarm.repeatDaysMask)
+    putString("missionType", stored.mission.missionType)
+    putInt("target", stored.mission.target)
+    putNullableDouble("nextOccurrenceAtUtcMs", occurrence?.scheduledAtUtcMs)
+    putString("scheduleHealth", scheduleHealth(alarm.enabled, occurrence))
+  }
+
+  private fun launchAck(receipt: LaunchReceipt) = Arguments.createMap().apply {
+    putString("requestId", receipt.requestId)
+    putString("sessionId", receipt.sessionId)
+    putBoolean("launched", true)
+    putString("launchType", "ACTIVE_INSTANCE")
   }
 
   private fun alarmSnapshot(stored: AlarmWithMission) = Arguments.createMap().apply {
@@ -194,13 +471,7 @@ class MissionAlarmModule(
     putNullableDouble("nextOccurrenceAtUtcMs", occurrence?.scheduledAtUtcMs)
     putString(
       "scheduleHealth",
-      when {
-        !alarm.enabled -> "DISABLED"
-        occurrence == null -> "PENDING"
-        occurrence.state == "SCHEDULED_OS" -> "HEALTHY"
-        occurrence.state == "FAILED" -> "FAILED"
-        else -> "PENDING"
-      },
+      scheduleHealth(alarm.enabled, occurrence),
     )
     putNullableString("scheduleErrorCode", occurrence?.lastErrorCode)
   }
@@ -320,10 +591,15 @@ class MissionAlarmModule(
       is AlarmSchedulingRepositoryException.IdempotencyKeyReused -> "IDEMPOTENCY_KEY_REUSED"
       is AlarmSchedulingRepositoryException.QrNotRegistered -> "QR_NOT_REGISTERED"
       is AlarmSchedulingRepositoryException.AlreadyEnabled,
+      is AlarmSchedulingRepositoryException.AlreadyDisabled,
+      is AlarmSchedulingRepositoryException.ActiveInstanceExists,
       is AlarmSchedulingRepositoryException.ScheduleExpired,
       is AlarmSchedulingRepositoryException.PendingOccurrenceExists,
       -> "INVALID_STATE"
       is CapabilityRequired -> "CAPABILITY_REQUIRED"
+      is ActiveInstanceNotFound -> "NOT_FOUND"
+      is ActiveInstanceRevisionConflict -> "CONFLICT_REVISION"
+      is LaunchRequestReused -> "IDEMPOTENCY_KEY_REUSED"
       is IllegalArgumentException ->
         if (error.message?.contains("lowercase UUID v4") == true) {
           "INVALID_ARGUMENT"
@@ -337,6 +613,16 @@ class MissionAlarmModule(
 
   private class UnsupportedContractVersion : IllegalArgumentException()
   private class CapabilityRequired : IllegalStateException()
+  private class ActiveInstanceNotFound : IllegalStateException()
+  private class ActiveInstanceRevisionConflict : IllegalStateException()
+  private class LaunchRequestReused : IllegalStateException()
+
+  private data class LaunchReceipt(
+    val requestId: String,
+    val instanceId: String,
+    val expectedRevision: Int,
+    val sessionId: String,
+  )
 
   companion object {
     const val NAME = "NativeMissionAlarm"
@@ -344,8 +630,19 @@ class MissionAlarmModule(
     const val MINIMUM_CLIENT_CONTRACT_VERSION = 1
     const val PUSHUP_PROFILE_VERSION = "pushup-profile-v1"
     const val MATH_GENERATOR_VERSION = "math-v1"
+    const val HOME_HISTORY_LIMIT = 5
   }
 }
+
+private fun scheduleHealth(enabled: Boolean, occurrence: com.missionalarm.core.data.AlarmOccurrenceEntity?) =
+  when {
+    !enabled -> "DISABLED"
+    occurrence == null -> "PENDING"
+    occurrence.state == "SCHEDULED_OS" -> "HEALTHY"
+    occurrence.state == "FAILED" -> "FAILED"
+    occurrence.lastErrorCode == "EXACT_ALARM_CAPABILITY_REQUIRED" -> "BLOCKED"
+    else -> "PENDING"
+  }
 
 private fun ReadableMap.requiredString(key: String): String =
   requireNotNull(if (hasKey(key) && !isNull(key)) getString(key) else null) { "$key is required" }
@@ -363,6 +660,12 @@ private fun ReadableMap.nullableInt(key: String): Int? =
 
 private fun ReadableMap.nullableLong(key: String): Long? =
   if (!hasKey(key) || isNull(key)) null else getDouble(key).toContractLong()
+
+private fun ReadableMap.toAlarmAggregateCommand() = EnableAlarmCommand(
+  commandId = CommandId.parse(requiredString("commandId")),
+  alarmId = AlarmId.parse(requiredString("aggregateId")),
+  expectedRevision = Revision.of(requiredInt("expectedRevision")),
+)
 
 private fun Double.toContractInt(): Int {
   require(isFinite() && this % 1.0 == 0.0 && this in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble())

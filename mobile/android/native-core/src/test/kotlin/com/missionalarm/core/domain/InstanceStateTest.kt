@@ -41,6 +41,14 @@ class InstanceStateTest {
   }
 
   @Test
+  fun `attended recovery shell can emergency dismiss before mission starts`() {
+    val terminal = InstanceState.triggered().emergencyDismiss()
+
+    assertEquals(InstanceRuntimeState.TERMINAL, terminal.runtime)
+    assertEquals(TerminalResult.EMERGENCY_DISMISSED, terminal.terminalResult)
+  }
+
+  @Test
   fun `queued instance follows FIFO attention transition shape`() {
     val locked = InstanceState.triggered().queue().lockMission()
 

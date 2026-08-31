@@ -67,6 +67,7 @@ data class InstanceState(
   fun emergencyDismiss(): InstanceState {
     check(
       runtime in setOf(
+        InstanceRuntimeState.TRIGGERED,
         InstanceRuntimeState.MISSION_LOCKED,
         InstanceRuntimeState.MISSION_IN_PROGRESS,
         InstanceRuntimeState.RECOVERY_REQUIRED,

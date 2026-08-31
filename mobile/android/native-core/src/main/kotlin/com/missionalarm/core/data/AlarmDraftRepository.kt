@@ -183,7 +183,7 @@ class AlarmDraftRepository(
   }
 }
 
-private object DraftRequestHasher {
+internal object DraftRequestHasher {
   fun hash(command: SaveAlarmDraftCommand): String {
     val canonicalFields = listOf(
       command.alarmId?.value,

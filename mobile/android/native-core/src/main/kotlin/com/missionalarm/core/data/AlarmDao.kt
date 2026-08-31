@@ -21,6 +21,9 @@ abstract class AlarmDao {
   @Query("DELETE FROM alarm_mission_config WHERE alarm_id = :alarmId")
   abstract fun deleteMission(alarmId: String): Int
 
+  @Query("DELETE FROM alarm WHERE id = :alarmId")
+  abstract fun deleteAlarm(alarmId: String): Int
+
   @Transaction
   open fun insertDraft(
     alarm: AlarmEntity,
@@ -35,6 +38,20 @@ abstract class AlarmDao {
   @Transaction
   @Query("SELECT * FROM alarm WHERE id = :alarmId")
   abstract fun findById(alarmId: String): AlarmWithMission?
+
+  @Transaction
+  @Query("SELECT * FROM alarm WHERE enabled = 1 ORDER BY id")
+  abstract fun findAllEnabled(): List<AlarmWithMission>
+
+  @Transaction
+  @Query(
+    """
+    SELECT * FROM alarm
+    ORDER BY enabled DESC, local_time_minutes, id
+    LIMIT 500
+    """,
+  )
+  abstract fun findHomeAlarms(): List<AlarmWithMission>
 
   @Query("SELECT * FROM alarm WHERE id = :alarmId")
   abstract fun findAlarmEntity(alarmId: String): AlarmEntity?

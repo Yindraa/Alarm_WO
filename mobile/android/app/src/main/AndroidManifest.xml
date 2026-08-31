@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
@@ -32,5 +36,32 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+      <activity
+        android:name="com.missionalarm.runtime.AlarmHostActivity"
+        android:excludeFromRecents="true"
+        android:exported="false"
+        android:launchMode="singleTask"
+        android:showWhenLocked="true"
+        android:turnScreenOn="true" />
+      <receiver
+        android:name="com.missionalarm.scheduling.ExactAlarmReceiver"
+        android:directBootAware="true"
+        android:exported="false" />
+      <receiver
+        android:name="com.missionalarm.scheduling.BootReconciliationReceiver"
+        android:directBootAware="true"
+        android:exported="false">
+        <intent-filter>
+          <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+          <action android:name="android.intent.action.BOOT_COMPLETED" />
+          <action android:name="android.intent.action.USER_UNLOCKED" />
+          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        </intent-filter>
+      </receiver>
+      <service
+        android:name="com.missionalarm.runtime.AlarmForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="mediaPlayback"
+        android:stopWithTask="false" />
     </application>
 </manifest>
