@@ -67,7 +67,10 @@ export async function saveAlarmConfiguration(
   });
 }
 
-export type AlarmAggregateCommand = Omit<AggregateCommandMeta, 'contractVersion'>;
+export type AlarmAggregateCommand = Omit<
+  AggregateCommandMeta,
+  'contractVersion'
+>;
 
 export async function enableAlarm(
   command: AlarmAggregateCommand,
@@ -102,7 +105,10 @@ export async function deleteAlarm(
 function validateAggregateCommand(command: AlarmAggregateCommand): void {
   requireUuid(command.commandId, 'commandId');
   requireUuid(command.aggregateId, 'aggregateId');
-  if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
+  if (
+    !Number.isInteger(command.expectedRevision) ||
+    command.expectedRevision < 1
+  ) {
     throw new Error('INVALID_ARGUMENT');
   }
 }
@@ -152,7 +158,10 @@ export async function launchActiveInstance(
 ): Promise<LaunchAck> {
   requireUuid(request.requestId, 'requestId');
   requireUuid(request.aggregateId, 'aggregateId');
-  if (!Number.isInteger(request.expectedRevision) || request.expectedRevision < 1) {
+  if (
+    !Number.isInteger(request.expectedRevision) ||
+    request.expectedRevision < 1
+  ) {
     throw new Error('INVALID_ARGUMENT');
   }
   return NativeMissionAlarm.launchActiveInstance({
@@ -166,19 +175,79 @@ function validateDraft(draft: SaveAlarmDraft): void {
   if (draft.alarmId !== null) {
     requireUuid(draft.alarmId, 'alarmId');
   }
-  if (draft.label.trim().length < 1 || draft.label.trim().length > 80) {
+  const revisionValid =
+    (draft.alarmId === null && draft.expectedRevision === null) ||
+    (draft.alarmId !== null &&
+      Number.isInteger(draft.expectedRevision) &&
+      Number(draft.expectedRevision) >= 1);
+  if (
+    !revisionValid ||
+    draft.label.trim().length < 1 ||
+    draft.label.trim().length > 80
+  ) {
     throw new Error('VALIDATION_FAILED');
   }
-  if (!Number.isInteger(draft.localTimeMinutes) || draft.localTimeMinutes < 0 || draft.localTimeMinutes > 1439) {
+  if (
+    !Number.isInteger(draft.localTimeMinutes) ||
+    draft.localTimeMinutes < 0 ||
+    draft.localTimeMinutes > 1439
+  ) {
     throw new Error('VALIDATION_FAILED');
   }
-  if (!Number.isInteger(draft.target) || draft.target < 1) {
+  const weekly =
+    draft.scheduleKind === 'WEEKLY' &&
+    Number.isInteger(draft.repeatDaysMask) &&
+    draft.repeatDaysMask >= 1 &&
+    draft.repeatDaysMask <= 127 &&
+    draft.oneTimeAtUtcMs === null;
+  const oneTime =
+    draft.scheduleKind === 'ONE_TIME' &&
+    draft.repeatDaysMask === 0 &&
+    draft.oneTimeAtUtcMs !== null &&
+    Number.isFinite(draft.oneTimeAtUtcMs) &&
+    draft.oneTimeAtUtcMs >= 0;
+  if (!weekly && !oneTime) {
+    throw new Error('VALIDATION_FAILED');
+  }
+  if (draft.configuredTimezoneId.trim() === '' || draft.soundId.trim() === '') {
+    throw new Error('VALIDATION_FAILED');
+  }
+  const pushup =
+    draft.missionType === 'PUSH_UP' &&
+    draft.target >= 1 &&
+    draft.target <= 50 &&
+    draft.pushupProfileVersion !== null &&
+    draft.pushupProfileVersion.trim() !== '' &&
+    draft.mathOperationsMask === null &&
+    draft.mathGeneratorVersion === null;
+  const math =
+    draft.missionType === 'MATH' &&
+    draft.target >= 1 &&
+    draft.target <= 10 &&
+    draft.pushupProfileVersion === null &&
+    draft.mathOperationsMask !== null &&
+    Number.isInteger(draft.mathOperationsMask) &&
+    draft.mathOperationsMask >= 1 &&
+    draft.mathOperationsMask <= 7 &&
+    draft.mathGeneratorVersion !== null &&
+    draft.mathGeneratorVersion.trim() !== '';
+  const qr =
+    draft.missionType === 'QR' &&
+    draft.target === 1 &&
+    draft.pushupProfileVersion === null &&
+    draft.mathOperationsMask === null &&
+    draft.mathGeneratorVersion === null;
+  if (!Number.isInteger(draft.target) || (!pushup && !math && !qr)) {
     throw new Error('VALIDATION_FAILED');
   }
 }
 
 function requireUuid(value: string, _field: string): void {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)) {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      value,
+    )
+  ) {
     throw new Error('INVALID_ARGUMENT');
   }
 }

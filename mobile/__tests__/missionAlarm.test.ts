@@ -55,8 +55,26 @@ describe('mission alarm native wrapper', () => {
 
   it('rejects malformed identifiers before calling native', async () => {
     await expect(
-      saveAlarmConfiguration({...validDraft(), commandId: 'not-a-uuid'}),
+      saveAlarmConfiguration({ ...validDraft(), commandId: 'not-a-uuid' }),
     ).rejects.toThrow('INVALID_ARGUMENT');
+    expect(native.saveAlarmConfiguration).not.toHaveBeenCalled();
+  });
+
+  it('rejects inconsistent schedule and mission configurations before native', async () => {
+    await expect(
+      saveAlarmConfiguration({
+        ...validDraft(),
+        scheduleKind: 'WEEKLY',
+        repeatDaysMask: 0,
+      }),
+    ).rejects.toThrow('VALIDATION_FAILED');
+    await expect(
+      saveAlarmConfiguration({
+        ...validDraft(),
+        missionType: 'QR',
+        target: 3,
+      }),
+    ).rejects.toThrow('VALIDATION_FAILED');
     expect(native.saveAlarmConfiguration).not.toHaveBeenCalled();
   });
 
@@ -198,29 +216,32 @@ describe('mission alarm native wrapper', () => {
   it.each([
     ['disable', disableAlarm, native.disableAlarm],
     ['delete', deleteAlarm, native.deleteAlarm],
-  ] as const)('adds contract metadata before %s', async (_name, command, nativeMethod) => {
-    nativeMethod.mockResolvedValue({
-      commandId: COMMAND_ID,
-      aggregateType: 'ALARM',
-      aggregateId: ALARM_ID,
-      revision: 3,
-      appliedAtMs: 1000,
-      replayed: false,
-    });
-    const input = {
-      commandId: COMMAND_ID,
-      aggregateId: ALARM_ID,
-      expectedRevision: 2,
-    };
+  ] as const)(
+    'adds contract metadata before %s',
+    async (_name, command, nativeMethod) => {
+      nativeMethod.mockResolvedValue({
+        commandId: COMMAND_ID,
+        aggregateType: 'ALARM',
+        aggregateId: ALARM_ID,
+        revision: 3,
+        appliedAtMs: 1000,
+        replayed: false,
+      });
+      const input = {
+        commandId: COMMAND_ID,
+        aggregateId: ALARM_ID,
+        expectedRevision: 2,
+      };
 
-    const result = await command(input);
+      const result = await command(input);
 
-    expect(result.revision).toBe(3);
-    expect(nativeMethod).toHaveBeenCalledWith({
-      ...input,
-      contractVersion: MISSION_ALARM_CONTRACT_VERSION,
-    });
-  });
+      expect(result.revision).toBe(3);
+      expect(nativeMethod).toHaveBeenCalledWith({
+        ...input,
+        contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+      });
+    },
+  );
 });
 
 function validDraft(): SaveAlarmDraft {
@@ -253,10 +274,10 @@ function capabilitySnapshot() {
   return {
     checkedAtMs: 1000,
     androidApiLevel: 37,
-    exactAlarm: {capability: 'EXACT_ALARM', ...state},
-    notifications: {capability: 'NOTIFICATIONS', ...state},
-    fullScreenIntent: {capability: 'FULL_SCREEN_INTENT', ...state},
-    camera: {capability: 'CAMERA', ...state},
+    exactAlarm: { capability: 'EXACT_ALARM', ...state },
+    notifications: { capability: 'NOTIFICATIONS', ...state },
+    fullScreenIntent: { capability: 'FULL_SCREEN_INTENT', ...state },
+    camera: { capability: 'CAMERA', ...state },
   };
 }
 

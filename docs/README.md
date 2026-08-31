@@ -21,10 +21,13 @@ Dokumentasi ini menjadi sumber acuan perancangan dan implementasi Mission Alarm.
 | Milestone | Status | Evidence |
 |---|---|---|
 | M0 — Delivery readiness | Accepted for personal/portfolio scope | [`implementation/M0_DELIVERY_READINESS.md`](implementation/M0_DELIVERY_READINESS.md) |
-| M1 — Native foundation vertical | In Progress — persisted save/query/enable slices operational | [`implementation/M1_NATIVE_FOUNDATION.md`](implementation/M1_NATIVE_FOUNDATION.md) |
+| M1 — Native foundation vertical | Complete — implementation evidence green | [`implementation/M1_NATIVE_FOUNDATION.md`](implementation/M1_NATIVE_FOUNDATION.md) |
+| M2 — Reliable alarm core | Complete for automated portfolio scope — physical/audio qualification deferred | [`implementation/M2_RELIABLE_ALARM_CORE.md`](implementation/M2_RELIABLE_ALARM_CORE.md) |
+| M3 — Application shell | In Progress — durable editor and authoritative enable/disable flow operational | [`implementation/M3_APPLICATION_SHELL.md`](implementation/M3_APPLICATION_SHELL.md) |
 
 - Requirement/test traceability: [`traceability/REQUIREMENT_TEST_REGISTRY.md`](traceability/REQUIREMENT_TEST_REGISTRY.md)
 - License and asset metadata: [`governance/LICENSE_REGISTRY.md`](governance/LICENSE_REGISTRY.md)
+- Latest M2 emulator qualification: [`qualification/M2_EMULATOR_QUALIFICATION_2026-08-31.md`](qualification/M2_EMULATOR_QUALIFICATION_2026-08-31.md)
 
 ## Sumber
 
