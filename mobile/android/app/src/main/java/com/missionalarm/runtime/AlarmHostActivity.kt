@@ -5,6 +5,9 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
@@ -12,6 +15,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.text.InputFilter
 import android.text.InputType
 import android.text.format.DateFormat
 import android.view.Gravity
@@ -63,9 +67,13 @@ class AlarmHostActivity : Activity() {
   private lateinit var progress: TextView
   private lateinit var queue: TextView
   private lateinit var mathWorkspace: LinearLayout
+  private lateinit var mathEyebrow: TextView
+  private lateinit var mathProgressTrack: LinearLayout
   private lateinit var mathQuestion: TextView
   private lateinit var mathAnswer: EditText
   private lateinit var mathFeedback: TextView
+  private lateinit var mathKeypad: LinearLayout
+  private val mathKeypadButtons = mutableListOf<Button>()
   private lateinit var primaryAction: Button
   private lateinit var emergencyStatus: TextView
   private lateinit var emergencyAction: Button
@@ -133,6 +141,8 @@ class AlarmHostActivity : Activity() {
       )
     }
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    window.statusBarColor = getColor(R.color.alarm_host_background)
+    window.navigationBarColor = getColor(R.color.alarm_host_background)
   }
 
   private fun refreshFromCanonicalState() {
@@ -157,6 +167,8 @@ class AlarmHostActivity : Activity() {
   private fun renderActive(snapshot: ActiveRuntimeSnapshot, recoveredDifferentInstance: Boolean) {
     activeSnapshot = snapshot
     mathWorkspace.visibility = View.GONE
+    time.textSize = 48f
+    queue.visibility = View.VISIBLE
     val routeDecision = MissionRouteResolver.resolve(snapshot)
     time.text = DateFormat.getTimeFormat(this).format(Date())
     title.text = snapshot.label
@@ -265,6 +277,8 @@ class AlarmHostActivity : Activity() {
       return
     }
     activeSnapshot = snapshot
+    time.textSize = 20f
+    queue.visibility = View.GONE
     detail.setText(R.string.alarm_host_math_instruction)
     progress.text = getString(
       R.string.alarm_host_progress,
@@ -277,10 +291,19 @@ class AlarmHostActivity : Activity() {
       operationSymbol(question.operation),
       question.operandB,
     )
+    mathEyebrow.text = getString(
+      R.string.alarm_host_math_eyebrow,
+      snapshot.committedProgress + 1,
+      snapshot.target,
+    )
+    renderMathProgress(snapshot.committedProgress, snapshot.target)
     mathAnswer.text.clear()
-    mathAnswer.isEnabled = true
+    setMathInputEnabled(true)
     mathFeedback.setText(
       if (correctFeedback) R.string.alarm_host_math_correct else R.string.alarm_host_math_feedback_ready,
+    )
+    mathFeedback.setTextColor(
+      getColor(if (correctFeedback) R.color.alarm_host_success else R.color.alarm_host_secondary),
     )
     mathWorkspace.visibility = View.VISIBLE
     primaryAction.setText(R.string.alarm_host_math_submit)
@@ -293,13 +316,14 @@ class AlarmHostActivity : Activity() {
     val answer = mathAnswer.text.toString().trim().toIntOrNull()
     if (answer == null) {
       mathFeedback.setText(R.string.alarm_host_math_answer_required)
+      mathFeedback.setTextColor(getColor(R.color.alarm_host_danger))
       return
     }
     val ordinal = snapshot.mathQuestion?.ordinal ?: run {
       refreshFromCanonicalState()
       return
     }
-    mathAnswer.isEnabled = false
+    setMathInputEnabled(false)
     primaryAction.isEnabled = false
     loading.visibility = View.VISIBLE
     executor.execute {
@@ -326,9 +350,10 @@ class AlarmHostActivity : Activity() {
           result.isFailure -> renderMissionRouteRecovery(snapshot)
           outcome == null -> renderMissionRouteRecovery(snapshot)
           !outcome.correct -> {
-            mathAnswer.isEnabled = true
+            setMathInputEnabled(true)
             mathAnswer.selectAll()
             mathFeedback.setText(R.string.alarm_host_math_incorrect)
+            mathFeedback.setTextColor(getColor(R.color.alarm_host_danger))
             primaryAction.isEnabled = true
           }
           outcome.completed && outcome.promotedInstanceId != null -> refreshFromCanonicalState()
@@ -457,34 +482,62 @@ class AlarmHostActivity : Activity() {
     val content = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       gravity = Gravity.CENTER_HORIZONTAL
-      setPadding(24.dp, 48.dp, 24.dp, 32.dp)
+      setPadding(20.dp, 40.dp, 20.dp, 32.dp)
+      importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
     }
     loading = ProgressBar(this).apply {
       id = R.id.alarm_host_loading
       contentDescription = getString(R.string.alarm_host_loading)
+      indeterminateTintList = ColorStateList.valueOf(getColor(R.color.alarm_host_primary))
     }
     time = TextView(this).apply {
       id = R.id.alarm_host_time
-      textSize = 42f
+      textSize = 48f
       gravity = Gravity.CENTER
       setTypeface(typeface, Typeface.BOLD)
+      setTextColor(getColor(R.color.alarm_host_hero))
+      if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
     }
     title = TextView(this).apply {
       id = R.id.alarm_host_title
-      textSize = 28f
+      textSize = 26f
       gravity = Gravity.CENTER
       setTypeface(typeface, Typeface.BOLD)
       setPadding(0, 24.dp, 0, 8.dp)
+      setTextColor(getColor(R.color.alarm_host_text))
+      if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
     }
     detail = bodyText(R.id.alarm_host_detail)
-    progress = bodyText(R.id.alarm_host_progress)
-    queue = bodyText(R.id.alarm_host_queue)
+    progress = bodyText(R.id.alarm_host_progress).apply {
+      setTextColor(getColor(R.color.alarm_host_primary))
+      setTypeface(typeface, Typeface.BOLD)
+      setPadding(16.dp, 10.dp, 16.dp, 10.dp)
+      background = roundedBackground(R.color.alarm_host_primary_surface, radiusDp = 999)
+    }
+    queue = bodyText(R.id.alarm_host_queue).apply { textSize = 15f }
     mathQuestion = TextView(this).apply {
       id = R.id.alarm_host_math_question
       textSize = 36f
       gravity = Gravity.CENTER
       setTypeface(typeface, Typeface.BOLD)
       setPadding(0, 20.dp, 0, 12.dp)
+      setTextColor(getColor(R.color.alarm_host_text))
+      if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
+    }
+    mathEyebrow = TextView(this).apply {
+      id = R.id.alarm_host_math_eyebrow
+      textSize = 13f
+      gravity = Gravity.CENTER
+      letterSpacing = 0.08f
+      setTypeface(typeface, Typeface.BOLD)
+      setTextColor(getColor(R.color.alarm_host_primary))
+      if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
+    }
+    mathProgressTrack = LinearLayout(this).apply {
+      id = R.id.alarm_host_math_progress_track
+      orientation = LinearLayout.HORIZONTAL
+      gravity = Gravity.CENTER
+      contentDescription = getString(R.string.alarm_host_progress, 0, 1)
     }
     mathAnswer = EditText(this).apply {
       id = R.id.alarm_host_math_answer
@@ -494,23 +547,53 @@ class AlarmHostActivity : Activity() {
       hint = getString(R.string.alarm_host_math_answer_hint)
       contentDescription = getString(R.string.alarm_host_math_answer_description)
       maxLines = 1
+      filters = arrayOf(InputFilter.LengthFilter(11))
+      showSoftInputOnFocus = false
+      minHeight = 56.dp
+      setPadding(16.dp, 10.dp, 16.dp, 10.dp)
+      setTextColor(getColor(R.color.alarm_host_text))
+      setHintTextColor(getColor(R.color.alarm_host_secondary))
+      background = roundedBackground(
+        R.color.alarm_host_surface,
+        R.color.alarm_host_border,
+        radiusDp = 12,
+      )
     }
+    mathQuestion.labelFor = mathAnswer.id
     mathFeedback = bodyText(R.id.alarm_host_math_feedback).apply {
       textSize = 15f
       accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE
     }
+    mathKeypad = buildMathKeypad()
     mathWorkspace = LinearLayout(this).apply {
       id = R.id.alarm_host_math_workspace
       orientation = LinearLayout.VERTICAL
       visibility = View.GONE
-      addView(mathQuestion, matchWrap())
-      addView(mathAnswer, matchWrap())
+      setPadding(18.dp, 18.dp, 18.dp, 18.dp)
+      background = roundedBackground(
+        R.color.alarm_host_surface,
+        R.color.alarm_host_border,
+        radiusDp = 18,
+      )
+      addView(mathEyebrow, matchWrap())
+      addView(mathProgressTrack, matchWrap(topMargin = 14.dp))
+      addView(mathQuestion, matchWrap(topMargin = 4.dp))
+      addView(mathAnswer, matchWrap(topMargin = 8.dp))
       addView(mathFeedback, matchWrap())
+      addView(mathKeypad, matchWrap(topMargin = 8.dp))
     }
     primaryAction = Button(this).apply {
       id = R.id.alarm_host_primary_action
       isAllCaps = false
       setPadding(24.dp, 12.dp, 24.dp, 12.dp)
+      minHeight = 52.dp
+      setTextColor(getColor(R.color.alarm_host_on_primary))
+      setTypeface(typeface, Typeface.BOLD)
+      background = interactiveBackground(
+        R.color.alarm_host_primary,
+        R.color.alarm_host_surface_muted,
+        radiusDp = 16,
+      )
     }
     emergencyStatus = bodyText(R.id.alarm_host_recovery_status).apply {
       textSize = 14f
@@ -521,18 +604,30 @@ class AlarmHostActivity : Activity() {
       isAllCaps = false
       setText(R.string.alarm_host_emergency_action)
       contentDescription = getString(R.string.alarm_host_emergency_action_description)
+      minHeight = 52.dp
+      setTextColor(getColor(R.color.alarm_host_danger))
+      background = interactiveBackground(
+        R.color.alarm_host_surface,
+        R.color.alarm_host_primary_surface,
+        R.color.alarm_host_danger,
+        radiusDp = 16,
+      )
     }
     content.addView(loading)
     content.addView(time, matchWrap())
     content.addView(title, matchWrap())
     content.addView(detail, matchWrap())
-    content.addView(progress, matchWrap())
+    content.addView(progress, matchWrap(topMargin = 12.dp, horizontalMargin = 48.dp))
     content.addView(queue, matchWrap())
     content.addView(mathWorkspace, matchWrap(topMargin = 16.dp))
     content.addView(primaryAction, matchWrap(topMargin = 32.dp))
     content.addView(emergencyStatus, matchWrap())
     content.addView(emergencyAction, matchWrap(topMargin = 24.dp))
-    return ScrollView(this).apply { addView(content) }
+    return ScrollView(this).apply {
+      setBackgroundColor(getColor(R.color.alarm_host_background))
+      isFillViewport = true
+      addView(content)
+    }
   }
 
   private fun showEmergencyHoldDialog(snapshot: ActiveRuntimeSnapshot) {
@@ -701,12 +796,145 @@ class AlarmHostActivity : Activity() {
     textSize = 18f
     gravity = Gravity.CENTER
     setPadding(0, 8.dp, 0, 8.dp)
+    setTextColor(getColor(R.color.alarm_host_secondary))
   }
 
-  private fun matchWrap(topMargin: Int = 0) = LinearLayout.LayoutParams(
+  private fun buildMathKeypad() = LinearLayout(this).apply {
+    id = R.id.alarm_host_math_keypad
+    orientation = LinearLayout.VERTICAL
+    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+    listOf(
+      listOf("1", "2", "3"),
+      listOf("4", "5", "6"),
+      listOf("7", "8", "9"),
+      listOf("−", "0", "⌫"),
+    ).forEach { keys ->
+      addView(LinearLayout(this@AlarmHostActivity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        keys.forEach { key ->
+          addView(mathKeyButton(key), LinearLayout.LayoutParams(0, 54.dp, 1f).apply {
+            setMargins(4.dp, 4.dp, 4.dp, 4.dp)
+          })
+        }
+      }, matchWrap())
+    }
+  }
+
+  private fun mathKeyButton(key: String) = Button(this).apply {
+    isAllCaps = false
+    text = key
+    textSize = 20f
+    minHeight = 48.dp
+    setTextColor(
+      getColor(if (key == "−" || key == "⌫") R.color.alarm_host_primary else R.color.alarm_host_text),
+    )
+    contentDescription = when (key) {
+      "−" -> getString(R.string.alarm_host_math_toggle_sign)
+      "⌫" -> getString(R.string.alarm_host_math_delete_digit)
+      else -> key
+    }
+    background = interactiveBackground(
+      R.color.alarm_host_surface_muted,
+      R.color.alarm_host_primary_surface,
+      radiusDp = 14,
+    )
+    setOnClickListener {
+      when (key) {
+        "−" -> toggleMathSign()
+        "⌫" -> deleteMathDigit()
+        else -> replaceSelectedMathText(key)
+      }
+    }
+    mathKeypadButtons += this
+  }
+
+  private fun replaceSelectedMathText(value: String) {
+    if (!mathAnswer.isEnabled) return
+    val editable = mathAnswer.text
+    val first = mathAnswer.selectionStart.takeIf { it >= 0 } ?: editable.length
+    val second = mathAnswer.selectionEnd.takeIf { it >= 0 } ?: editable.length
+    val start = minOf(first, second)
+    val end = maxOf(first, second)
+    editable.replace(start, end, value)
+    mathAnswer.setSelection((start + value.length).coerceAtMost(editable.length))
+  }
+
+  private fun toggleMathSign() {
+    if (!mathAnswer.isEnabled) return
+    val current = mathAnswer.text.toString()
+    val updated = if (current.startsWith("-")) current.drop(1) else "-$current"
+    mathAnswer.setText(updated)
+    mathAnswer.setSelection(updated.length)
+  }
+
+  private fun deleteMathDigit() {
+    if (!mathAnswer.isEnabled) return
+    val editable = mathAnswer.text
+    val first = mathAnswer.selectionStart.takeIf { it >= 0 } ?: editable.length
+    val second = mathAnswer.selectionEnd.takeIf { it >= 0 } ?: editable.length
+    val start = minOf(first, second)
+    val end = maxOf(first, second)
+    when {
+      start != end -> editable.delete(start, end)
+      start > 0 -> editable.delete(start - 1, start)
+    }
+  }
+
+  private fun setMathInputEnabled(enabled: Boolean) {
+    mathAnswer.isEnabled = enabled
+    mathKeypadButtons.forEach { button ->
+      button.isEnabled = enabled
+      button.alpha = if (enabled) 1f else 0.45f
+    }
+  }
+
+  private fun renderMathProgress(committed: Int, target: Int) {
+    mathProgressTrack.removeAllViews()
+    repeat(target) { index ->
+      val color = when {
+        index < committed -> R.color.alarm_host_primary
+        index == committed -> R.color.alarm_host_amber
+        else -> R.color.alarm_host_border
+      }
+      mathProgressTrack.addView(View(this).apply {
+        background = roundedBackground(color, radiusDp = 999)
+      }, LinearLayout.LayoutParams(0, 7.dp, 1f).apply {
+        setMargins(3.dp, 0, 3.dp, 0)
+      })
+    }
+    mathProgressTrack.contentDescription = getString(R.string.alarm_host_progress, committed, target)
+  }
+
+  private fun matchWrap(topMargin: Int = 0, horizontalMargin: Int = 0) = LinearLayout.LayoutParams(
     LinearLayout.LayoutParams.MATCH_PARENT,
     LinearLayout.LayoutParams.WRAP_CONTENT,
-  ).apply { this.topMargin = topMargin }
+  ).apply {
+    this.topMargin = topMargin
+    marginStart = horizontalMargin
+    marginEnd = horizontalMargin
+  }
+
+  private fun roundedBackground(
+    fillColor: Int,
+    strokeColor: Int? = null,
+    radiusDp: Int,
+  ) = GradientDrawable().apply {
+    shape = GradientDrawable.RECTANGLE
+    cornerRadius = radiusDp.dp.toFloat()
+    setColor(getColor(fillColor))
+    strokeColor?.let { setStroke(1.dp, getColor(it)) }
+  }
+
+  private fun interactiveBackground(
+    fillColor: Int,
+    rippleColor: Int,
+    strokeColor: Int? = null,
+    radiusDp: Int,
+  ) = RippleDrawable(
+    ColorStateList.valueOf(getColor(rippleColor)),
+    roundedBackground(fillColor, strokeColor, radiusDp),
+    null,
+  )
 
   private fun missionName(type: String) = when (type) {
     "MATH" -> getString(R.string.mission_name_math)

@@ -1,0 +1,5 @@
+<resources>
+  <item name="qr_registration_preview" type="id" />
+  <item name="qr_registration_status" type="id" />
+  <item name="qr_registration_permission_panel" type="id" />
+</resources>

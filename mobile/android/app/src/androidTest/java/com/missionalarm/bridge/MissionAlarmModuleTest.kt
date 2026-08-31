@@ -36,12 +36,14 @@ class MissionAlarmModuleTest {
   private lateinit var context: ReactApplicationContext
   private lateinit var module: MissionAlarmModule
   private val presentedInstances = mutableListOf<String>()
+  private val launchedQrRequests = mutableListOf<Triple<String, String, Int>>()
 
   @Before
   fun setUp() {
     val application = ApplicationProvider.getApplicationContext<android.content.Context>()
     application.deleteDatabase(DATABASE_NAME)
     presentedInstances.clear()
+    launchedQrRequests.clear()
     context = BridgeReactContext(application)
     module = testModule(capability = true)
   }
@@ -100,6 +102,37 @@ class MissionAlarmModuleTest {
 
     assertNull(rejected.value)
     assertEquals("IDEMPOTENCY_KEY_REUSED", rejected.error?.getString("code"))
+  }
+
+  @Test
+  fun qrRegistrationLaunchRequiresPersistedQrDraftAndDebouncesRequest() {
+    val saved = invoke { promise -> module.saveAlarmConfiguration(qrDraft(), promise) }
+    val alarmId = (saved.value as ReadableMap).getString("aggregateId")!!
+
+    val stale = invoke { promise ->
+      module.launchQrRegistration(qrLaunch(QR_STALE_REQUEST_ID, alarmId, 2), promise)
+    }
+    assertEquals("CONFLICT_REVISION", stale.error?.getString("code"))
+    assertTrue(launchedQrRequests.isEmpty())
+
+    val first = invoke { promise ->
+      module.launchQrRegistration(qrLaunch(QR_LAUNCH_REQUEST_ID, alarmId, 1), promise)
+    }
+    val replay = invoke { promise ->
+      module.launchQrRegistration(qrLaunch(QR_LAUNCH_REQUEST_ID, alarmId, 1), promise)
+    }
+
+    assertNull(first.error)
+    assertNull(replay.error)
+    assertEquals("QR_REGISTRATION", (first.value as ReadableMap).getString("launchType"))
+    assertEquals(
+      (first.value as ReadableMap).getString("sessionId"),
+      (replay.value as ReadableMap).getString("sessionId"),
+    )
+    assertEquals(
+      listOf(Triple(QR_LAUNCH_REQUEST_ID, alarmId, 1)),
+      launchedQrRequests,
+    )
   }
 
   @Test
@@ -243,6 +276,43 @@ class MissionAlarmModuleTest {
     assertEquals(listOf(INSTANCE_ID), presentedInstances)
   }
 
+  @Test
+  fun MathRuntimeCommandsRoundTripWithDurableReplay() {
+    val saved = invoke { promise -> module.saveAlarmConfiguration(draft(), promise) }
+    val alarmId = (saved.value as ReadableMap).getString("aggregateId")!!
+    assertNull(invoke { promise -> module.enableAlarm(enable(alarmId), promise) }.error)
+    seedTriggeredInstance(alarmId)
+
+    val started = invoke { promise ->
+      module.startMission(runtimeCommand(START_MISSION_COMMAND_ID, INSTANCE_ID, 1), promise)
+    }
+    val startReplay = invoke { promise ->
+      module.startMission(runtimeCommand(START_MISSION_COMMAND_ID, INSTANCE_ID, 1), promise)
+    }
+    assertNull(started.error)
+    assertNull(startReplay.error)
+    assertEquals(3, (started.value as ReadableMap).getInt("revision"))
+    assertTrue((startReplay.value as ReadableMap).getBoolean("replayed"))
+
+    val wrongInput = mathAnswer(
+      ANSWER_COMMAND_ID,
+      INSTANCE_ID,
+      expectedRevision = 3,
+      questionOrdinal = 0,
+      answer = Int.MAX_VALUE,
+    )
+    val wrong = invoke { promise -> module.submitMathAnswer(wrongInput, promise) }
+    val replay = invoke { promise -> module.submitMathAnswer(wrongInput, promise) }
+    assertNull(wrong.error)
+    assertNull(replay.error)
+    val wrongMap = wrong.value as ReadableMap
+    val replayMap = replay.value as ReadableMap
+    assertFalse(wrongMap.getBoolean("correct"))
+    assertFalse(wrongMap.getBoolean("replayed"))
+    assertTrue(replayMap.getBoolean("replayed"))
+    assertEquals(0, replayMap.getInt("committedProgress"))
+  }
+
   private fun invoke(call: (PromiseImpl) -> Unit): PromiseResult {
     val latch = CountDownLatch(1)
     var value: Any? = null
@@ -281,6 +351,13 @@ class MissionAlarmModuleTest {
     putString("mathGeneratorVersion", "math-v1")
   }
 
+  private fun qrDraft() = draft().apply {
+    putString("missionType", "QR")
+    putInt("target", 1)
+    putNull("mathOperationsMask")
+    putNull("mathGeneratorVersion")
+  }
+
   private fun enable(alarmId: String) = Arguments.createMap().apply {
     putInt("contractVersion", 1)
     putString("commandId", ENABLE_COMMAND_ID)
@@ -301,6 +378,33 @@ class MissionAlarmModuleTest {
     putString("requestId", LAUNCH_REQUEST_ID)
     putString("aggregateId", instanceId)
     putInt("expectedRevision", revision)
+  }
+
+  private fun qrLaunch(requestId: String, alarmId: String, revision: Int) =
+    Arguments.createMap().apply {
+      putInt("contractVersion", 1)
+      putString("requestId", requestId)
+      putString("aggregateId", alarmId)
+      putInt("expectedRevision", revision)
+    }
+
+  private fun runtimeCommand(commandId: String, instanceId: String, revision: Int) =
+    Arguments.createMap().apply {
+      putInt("contractVersion", 1)
+      putString("commandId", commandId)
+      putString("aggregateId", instanceId)
+      putInt("expectedRevision", revision)
+    }
+
+  private fun mathAnswer(
+    commandId: String,
+    instanceId: String,
+    expectedRevision: Int,
+    questionOrdinal: Int,
+    answer: Int,
+  ) = runtimeCommand(commandId, instanceId, expectedRevision).apply {
+    putInt("questionOrdinal", questionOrdinal)
+    putInt("answer", answer)
   }
 
   private fun seedTriggeredInstance(alarmId: String) {
@@ -332,6 +436,9 @@ class MissionAlarmModuleTest {
     exactAlarmSchedulerOverride = ExactAlarmScheduler { _, _ -> },
     directBootMirrorStoreOverride = DirectBootMirrorStore { _, _ -> },
     alarmHostPresenterOverride = { instanceId -> presentedInstances += instanceId },
+    qrRegistrationLauncherOverride = { requestId, alarmId, revision ->
+      launchedQrRequests += Triple(requestId, alarmId, revision)
+    },
   )
 
   private data class PromiseResult(val value: Any?, val error: ReadableMap?)
@@ -344,6 +451,10 @@ class MissionAlarmModuleTest {
     const val DISABLE_COMMAND_ID = "89927654-58ae-47d4-aaf8-50122651f698"
     const val DELETE_COMMAND_ID = "957c85c3-1292-46ec-a714-35a7bded0781"
     const val LAUNCH_REQUEST_ID = "4a0977be-9c83-46d2-8b55-d605b389f0cb"
+    const val QR_LAUNCH_REQUEST_ID = "f263b9e0-c845-428b-9f03-3c7d4b8977ee"
+    const val QR_STALE_REQUEST_ID = "565179a7-4a79-4265-9f7d-4ca20875a9cc"
+    const val START_MISSION_COMMAND_ID = "58573b64-5647-4189-bccc-ec14b6aa234e"
+    const val ANSWER_COMMAND_ID = "4da9f09c-ddaf-44ef-b52f-933d5c59b060"
     const val INSTANCE_ID = "95bc545a-c392-4c47-b5b5-d69eb0bb037d"
     const val NEXT_OCCURRENCE_ID = "056b5bed-8c7e-46b4-bdb1-b66337bf9e92"
     const val NOW_MS = 1_777_507_200_000L

@@ -3,6 +3,7 @@ package com.missionalarm.core.data
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.missionalarm.core.domain.WallClock
+import com.missionalarm.core.domain.CommandId
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -66,6 +67,54 @@ class MathMissionCoordinatorTest {
     assertEquals(started.revision, result.instanceRevision)
     assertFalse(database.runtimeDao().findMathQuestion(INSTANCE_ID, 0)!!.answered)
     assertEquals(0, database.runtimeDao().findMission(INSTANCE_ID)!!.committedProgress)
+  }
+
+  @Test
+  fun publicCommandsPersistReceiptsAndReplayExactOutcomesWithoutMutation() {
+    val started = coordinator.start(
+      StartMissionCommand(CommandId.parse(START_COMMAND_ID), INSTANCE_ID, 1),
+    )
+    val startReplay = coordinator.start(
+      StartMissionCommand(CommandId.parse(START_COMMAND_ID), INSTANCE_ID, 1),
+    )
+    assertEquals(3, started.revision)
+    assertTrue(startReplay.replayed)
+
+    val question = checkNotNull(database.runtimeDao().findMathQuestion(INSTANCE_ID, 0))
+    val command = SubmitMathAnswerCommand(
+      CommandId.parse(ANSWER_COMMAND_ID),
+      INSTANCE_ID,
+      started.revision,
+      0,
+      question.correctAnswer + 1,
+    )
+    val wrong = coordinator.submitAnswer(command)
+    val replay = coordinator.submitAnswer(command)
+
+    assertFalse(wrong.correct)
+    assertFalse(wrong.replayed)
+    assertFalse(replay.correct)
+    assertTrue(replay.replayed)
+    assertEquals(wrong.instanceRevision, replay.instanceRevision)
+    assertEquals(wrong.committedProgress, replay.committedProgress)
+    assertEquals(2L, scalar("SELECT COUNT(*) FROM command_receipt"))
+    assertEquals(0, database.runtimeDao().findMission(INSTANCE_ID)!!.committedProgress)
+  }
+
+  @Test(expected = MathMissionException.IdempotencyKeyReused::class)
+  fun reusingMathCommandIdWithDifferentEvidenceIsRejected() {
+    val started = coordinator.start(INSTANCE_ID)
+    coordinator.submitAnswer(
+      SubmitMathAnswerCommand(
+        CommandId.parse(ANSWER_COMMAND_ID), INSTANCE_ID, started.revision, 0, 999,
+      ),
+    )
+
+    coordinator.submitAnswer(
+      SubmitMathAnswerCommand(
+        CommandId.parse(ANSWER_COMMAND_ID), INSTANCE_ID, started.revision, 0, 998,
+      ),
+    )
   }
 
   @Test
@@ -215,6 +264,8 @@ class MathMissionCoordinatorTest {
 
   private companion object {
     const val NOW_MS = 10_000L
+    const val START_COMMAND_ID = "3aed9384-bf37-4692-87f1-161771ffc36f"
+    const val ANSWER_COMMAND_ID = "dd18f519-5445-40ba-95ac-8d7dd313bd80"
     const val ALARM_ID = "df0575a5-fc4f-4f70-8bc4-d67c7ba9577b"
     const val OCCURRENCE_ID = "36ca13ee-ac0c-4fe8-99f5-a0c577eafde3"
     const val INSTANCE_ID = "04e4c33e-dd25-42e0-8d19-1ce240f9d2f2"

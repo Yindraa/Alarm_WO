@@ -7,8 +7,11 @@ import {
   getAlarmEditorSnapshot,
   getHomeSnapshot,
   launchActiveInstance,
+  launchQrRegistration,
   MISSION_ALARM_CONTRACT_VERSION,
   saveAlarmConfiguration,
+  startMission,
+  submitMathAnswer,
   type SaveAlarmDraft,
 } from '../src/native/missionAlarm';
 
@@ -23,7 +26,10 @@ jest.mock('../src/native/specs/NativeMissionAlarm', () => ({
     enableAlarm: jest.fn(),
     disableAlarm: jest.fn(),
     deleteAlarm: jest.fn(),
+    startMission: jest.fn(),
+    submitMathAnswer: jest.fn(),
     launchActiveInstance: jest.fn(),
+    launchQrRegistration: jest.fn(),
   },
 }));
 
@@ -58,6 +64,28 @@ describe('mission alarm native wrapper', () => {
       saveAlarmConfiguration({ ...validDraft(), commandId: 'not-a-uuid' }),
     ).rejects.toThrow('INVALID_ARGUMENT');
     expect(native.saveAlarmConfiguration).not.toHaveBeenCalled();
+  });
+
+  it('launches QR registration without passing QR payload through the bridge', async () => {
+    native.launchQrRegistration.mockResolvedValue({
+      requestId: COMMAND_ID,
+      sessionId: ALARM_ID,
+      launched: true,
+      launchType: 'QR_REGISTRATION',
+    });
+
+    await launchQrRegistration({
+      requestId: COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 1,
+    });
+
+    expect(native.launchQrRegistration).toHaveBeenCalledWith({
+      contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+      requestId: COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 1,
+    });
   });
 
   it('rejects inconsistent schedule and mission configurations before native', async () => {
@@ -242,6 +270,69 @@ describe('mission alarm native wrapper', () => {
       });
     },
   );
+
+  it('adds contract metadata to Math runtime commands', async () => {
+    native.startMission.mockResolvedValue({
+      commandId: COMMAND_ID,
+      aggregateType: 'INSTANCE',
+      aggregateId: ALARM_ID,
+      revision: 3,
+      appliedAtMs: 1000,
+      replayed: false,
+    });
+    native.submitMathAnswer.mockResolvedValue({
+      commandId: ANSWER_COMMAND_ID,
+      instanceId: ALARM_ID,
+      instanceRevision: 4,
+      correct: true,
+      committedProgress: 1,
+      completed: false,
+      appliedAtMs: 1001,
+      replayed: false,
+    });
+
+    await startMission({
+      commandId: COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 1,
+    });
+    const outcome = await submitMathAnswer({
+      commandId: ANSWER_COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 3,
+      questionOrdinal: 0,
+      answer: -2,
+    });
+
+    expect(outcome.correct).toBe(true);
+    expect(native.startMission).toHaveBeenCalledWith({
+      contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+      commandId: COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 1,
+    });
+    expect(native.submitMathAnswer).toHaveBeenCalledWith({
+      contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+      commandId: ANSWER_COMMAND_ID,
+      aggregateId: ALARM_ID,
+      expectedRevision: 3,
+      questionOrdinal: 0,
+      answer: -2,
+    });
+  });
+
+  it('rejects malformed Math evidence before calling native', async () => {
+    await expect(
+      submitMathAnswer({
+        commandId: ANSWER_COMMAND_ID,
+        aggregateId: ALARM_ID,
+        expectedRevision: 3,
+        questionOrdinal: -1,
+        answer: 1.5,
+      }),
+    ).rejects.toThrow('INVALID_ARGUMENT');
+    expect(native.submitMathAnswer).not.toHaveBeenCalled();
+  });
 });
 
 function validDraft(): SaveAlarmDraft {
@@ -324,5 +415,6 @@ function noActiveSnapshot() {
 }
 
 const COMMAND_ID = '126baf63-80fb-4449-89ac-37667b33ff44';
+const ANSWER_COMMAND_ID = '692fe812-47dc-4204-a21a-6adf926e486b';
 const ALARM_ID = '5a7464b0-77b6-4f75-8459-974dc6d44160';
 const SESSION_ID = '87f88d28-b149-4843-9490-477c3630dc8c';

@@ -18,6 +18,22 @@ abstract class AlarmDao {
   @Update
   abstract fun updateAlarm(alarm: AlarmEntity): Int
 
+  @Query(
+    """
+    UPDATE alarm_mission_config
+    SET qr_reference_digest = :digest, qr_digest_version = :digestVersion,
+      qr_key_alias = :keyAlias
+    WHERE alarm_id = :alarmId AND mission_type = 'QR'
+      AND qr_reference_digest IS NULL AND qr_digest_version IS NULL AND qr_key_alias IS NULL
+    """,
+  )
+  abstract fun registerQrReference(
+    alarmId: String,
+    digest: ByteArray,
+    digestVersion: String,
+    keyAlias: String,
+  ): Int
+
   @Query("DELETE FROM alarm_mission_config WHERE alarm_id = :alarmId")
   abstract fun deleteMission(alarmId: String): Int
 

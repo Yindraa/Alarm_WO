@@ -21,6 +21,7 @@ import {
   getContractInfo,
   getHomeSnapshot,
   launchActiveInstance,
+  launchQrRegistration,
   saveAlarmConfiguration,
   type AlarmEditorSnapshot,
   type ContractInfo,
@@ -710,6 +711,7 @@ function EditorShell({
       }>
     | Readonly<{ status: 'error' }>
   >({ status: 'loading' });
+  const lastEditorAppState = useRef(AppState.currentState);
 
   useEffect(() => {
     let active = true;
@@ -733,6 +735,38 @@ function EditorShell({
       });
     return () => {
       active = false;
+    };
+  }, [alarmId]);
+
+  useEffect(() => {
+    let active = true;
+    const subscription = AppState.addEventListener('change', nextState => {
+      const returned =
+        lastEditorAppState.current !== 'active' && nextState === 'active';
+      lastEditorAppState.current = nextState;
+      if (!returned || alarmId === null) {
+        return;
+      }
+      getAlarmEditorSnapshot(alarmId)
+        .then(snapshot => {
+          if (active) {
+            setState({
+              status: 'ready',
+              snapshot,
+              form: editorForm(snapshot),
+              saving: false,
+              pendingCommandId: null,
+              error: null,
+            });
+          }
+        })
+        .catch(() => {
+          if (active) setState({ status: 'error' });
+        });
+    });
+    return () => {
+      active = false;
+      subscription?.remove();
     };
   }, [alarmId]);
 
@@ -778,6 +812,38 @@ function EditorShell({
               saving: false,
               pendingCommandId: commandId,
               error: saveErrorCopy(error),
+            }
+          : current,
+      );
+    }
+  };
+
+  const registerQr = async () => {
+    if (
+      state.status !== 'ready' ||
+      state.saving ||
+      state.snapshot.alarm === null
+    ) {
+      return;
+    }
+    const alarm = state.snapshot.alarm;
+    setState({ ...state, saving: true, error: null });
+    try {
+      await launchQrRegistration({
+        requestId: createUuidV4(),
+        aggregateId: alarm.id,
+        expectedRevision: alarm.revision,
+      });
+      setState(current =>
+        current.status === 'ready' ? { ...current, saving: false } : current,
+      );
+    } catch (error) {
+      setState(current =>
+        current.status === 'ready'
+          ? {
+              ...current,
+              saving: false,
+              error: qrRegistrationErrorCopy(error),
             }
           : current,
       );
@@ -1070,10 +1136,50 @@ function EditorShell({
                 </View>
               </View>
             ) : (
-              <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
-                QR dapat disimpan sebagai draft; pendaftaran QR dilakukan pada
-                tahap QR berikutnya.
-              </Text>
+              <View style={styles.qrRegistrationBox}>
+                <View style={styles.qrRegistrationCopy}>
+                  <Text style={[styles.fieldTitle, { color: colors.text }]}>
+                    {state.snapshot.alarm?.mission.missionType === 'QR' &&
+                    state.snapshot.alarm.mission.qrRegistered
+                      ? 'QR sudah terdaftar'
+                      : 'Daftarkan QR referensi'}
+                  </Text>
+                  <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
+                    {state.snapshot.alarm === null ||
+                    state.snapshot.alarm.mission.missionType !== 'QR'
+                      ? 'Simpan alarm sebagai draft QR terlebih dahulu, lalu buka kembali editor ini.'
+                      : state.snapshot.alarm.mission.qrRegistered
+                      ? 'Hanya digest aman yang tersimpan. Isi QR tidak disimpan.'
+                      : 'Pindai satu QR yang nantinya wajib ditemukan untuk mematikan alarm.'}
+                  </Text>
+                </View>
+                {state.snapshot.alarm?.mission.missionType === 'QR' &&
+                  !state.snapshot.alarm.mission.qrRegistered && (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={
+                        state.saving ||
+                        state.snapshot.capabilities.camera.status === 'UNAVAILABLE'
+                      }
+                      onPress={registerQr}
+                      style={[
+                        styles.qrRegistrationButton,
+                        {
+                          backgroundColor:
+                            state.saving ||
+                            state.snapshot.capabilities.camera.status ===
+                              'UNAVAILABLE'
+                              ? colors.disabled
+                              : colors.primary,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.primaryLabel}>
+                        {state.saving ? 'Membuka kamera…' : 'Pindai QR'}
+                      </Text>
+                    </Pressable>
+                  )}
+              </View>
             )}
           </EditorSection>
 
@@ -1632,6 +1738,17 @@ function saveErrorCopy(error: unknown): string {
   return 'Alarm belum tersimpan. Periksa input lalu coba lagi.';
 }
 
+function qrRegistrationErrorCopy(error: unknown): string {
+  const code = nativeErrorCode(error);
+  if (code.includes('CONFLICT_REVISION')) {
+    return 'Alarm berubah. Tutup editor, buka kembali, lalu ulangi pendaftaran QR.';
+  }
+  if (code.includes('NOT_FOUND')) {
+    return 'Draft alarm QR tidak ditemukan.';
+  }
+  return 'Pemindai QR belum dapat dibuka. Pastikan alarm berupa draft QR nonaktif.';
+}
+
 function nativeErrorCode(error: unknown): string {
   const nativeCode =
     typeof error === 'object' && error !== null && 'code' in error
@@ -1644,6 +1761,7 @@ function nativeErrorCode(error: unknown): string {
       'CAPABILITY_REQUIRED',
       'QR_NOT_REGISTERED',
       'CONFLICT_REVISION',
+      'NOT_FOUND',
       'INVALID_STATE',
     ].find(code => combined.includes(code)) ?? 'UNKNOWN'
   );
@@ -2274,6 +2392,14 @@ const styles = StyleSheet.create({
     width: 16,
   },
   infoText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  qrRegistrationBox: { gap: 12 },
+  qrRegistrationCopy: { gap: 4 },
+  qrRegistrationButton: {
+    alignItems: 'center',
+    borderRadius: 16,
+    justifyContent: 'center',
+    minHeight: 52,
+  },
   editorErrorBanner: {
     borderRadius: 14,
     padding: 13,

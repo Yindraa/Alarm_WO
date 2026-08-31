@@ -1,0 +1,15 @@
+<resources>
+    <color name="alarm_host_background">#081321</color>
+    <color name="alarm_host_surface">#111F31</color>
+    <color name="alarm_host_surface_muted">#172A40</color>
+    <color name="alarm_host_text">#F3F7FC</color>
+    <color name="alarm_host_secondary">#AABBD0</color>
+    <color name="alarm_host_primary">#63B3FF</color>
+    <color name="alarm_host_primary_surface">#163A5B</color>
+    <color name="alarm_host_hero">#164A78</color>
+    <color name="alarm_host_border">#294059</color>
+    <color name="alarm_host_danger">#FF8792</color>
+    <color name="alarm_host_success">#62D0A8</color>
+    <color name="alarm_host_amber">#FFC766</color>
+    <color name="alarm_host_on_primary">#081321</color>
+</resources>

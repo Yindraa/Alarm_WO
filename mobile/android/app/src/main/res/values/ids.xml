@@ -6,9 +6,12 @@
     <item name="alarm_host_progress" type="id" />
     <item name="alarm_host_queue" type="id" />
     <item name="alarm_host_math_workspace" type="id" />
+    <item name="alarm_host_math_eyebrow" type="id" />
+    <item name="alarm_host_math_progress_track" type="id" />
     <item name="alarm_host_math_question" type="id" />
     <item name="alarm_host_math_answer" type="id" />
     <item name="alarm_host_math_feedback" type="id" />
+    <item name="alarm_host_math_keypad" type="id" />
     <item name="alarm_host_primary_action" type="id" />
     <item name="alarm_host_recovery_status" type="id" />
     <item name="alarm_host_emergency_action" type="id" />

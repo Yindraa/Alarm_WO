@@ -137,6 +137,26 @@ export type CommandAck = Readonly<{
   replayed: boolean;
 }>;
 
+export type SubmitMathAnswerInput = Readonly<{
+  contractVersion: CodegenTypes.Int32;
+  commandId: string;
+  aggregateId: string;
+  expectedRevision: CodegenTypes.Int32;
+  questionOrdinal: CodegenTypes.Int32;
+  answer: CodegenTypes.Int32;
+}>;
+
+export type AnswerOutcome = Readonly<{
+  commandId: string;
+  instanceId: string;
+  instanceRevision: CodegenTypes.Int32;
+  correct: boolean;
+  committedProgress: CodegenTypes.Int32;
+  completed: boolean;
+  appliedAtMs: CodegenTypes.Double;
+  replayed: boolean;
+}>;
+
 export type MathQuestionView = Readonly<{
   ordinal: CodegenTypes.Int32;
   total: CodegenTypes.Int32;
@@ -193,6 +213,9 @@ export interface Spec extends TurboModule {
   enableAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
   disableAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
   deleteAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
+  startMission(input: AggregateCommandMeta): Promise<CommandAck>;
+  submitMathAnswer(input: SubmitMathAnswerInput): Promise<AnswerOutcome>;
+  launchQrRegistration(input: NativeLaunchRequest): Promise<LaunchAck>;
   launchActiveInstance(input: NativeLaunchRequest): Promise<LaunchAck>;
 }
 

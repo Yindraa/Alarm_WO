@@ -20,14 +20,16 @@
     <string name="alarm_host_continue_mission">Lanjutkan misi</string>
     <string name="alarm_host_retry_mission">Muat ulang misi</string>
     <string name="alarm_host_mission_recovery_required">Misi belum dapat dibuka dari state tersimpan. Muat ulang tanpa menghentikan alarm.</string>
-    <string name="alarm_host_math_route_ready">Rute matematika siap: %1$d %2$s %3$d. Input dan verifikasi jawaban akan dihubungkan pada implementasi misi matematika.</string>
     <string name="alarm_host_math_instruction">Jawab dengan benar untuk melanjutkan. Alarm berhenti setelah seluruh soal selesai.</string>
+    <string name="alarm_host_math_eyebrow">MISI MATEMATIKA · SOAL %1$d/%2$d</string>
     <string name="alarm_host_math_question">%1$d %2$s %3$d = ?</string>
     <string name="alarm_host_math_answer_hint">Jawaban</string>
     <string name="alarm_host_math_answer_description">Masukkan jawaban soal matematika</string>
     <string name="alarm_host_math_feedback_ready">Jawaban diverifikasi langsung di perangkat.</string>
     <string name="alarm_host_math_answer_required">Masukkan sebuah angka terlebih dahulu.</string>
     <string name="alarm_host_math_submit">Periksa jawaban</string>
+    <string name="alarm_host_math_toggle_sign">Ubah tanda positif atau negatif</string>
+    <string name="alarm_host_math_delete_digit">Hapus angka terakhir</string>
     <string name="alarm_host_math_incorrect">Belum tepat. Coba hitung kembali.</string>
     <string name="alarm_host_math_correct">Benar! Lanjut ke soal berikutnya.</string>
     <string name="alarm_host_math_safety_notice">Progress jawaban benar tersimpan. Kontrol darurat tetap tersedia.</string>

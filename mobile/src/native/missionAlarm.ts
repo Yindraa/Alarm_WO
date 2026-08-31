@@ -3,11 +3,13 @@ import NativeMissionAlarm, {
   type AlarmDraftInput,
   type AlarmEditorSnapshot,
   type ActiveRuntimeSnapshot,
+  type AnswerOutcome,
   type CommandAck,
   type ContractInfo,
   type HomeSnapshot,
   type LaunchAck,
   type NativeLaunchRequest,
+  type SubmitMathAnswerInput,
 } from './specs/NativeMissionAlarm';
 
 export const MISSION_ALARM_CONTRACT_VERSION = 1;
@@ -102,6 +104,40 @@ export async function deleteAlarm(
   });
 }
 
+export async function startMission(
+  command: AlarmAggregateCommand,
+): Promise<CommandAck> {
+  validateAggregateCommand(command);
+  return NativeMissionAlarm.startMission({
+    ...command,
+    contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+  });
+}
+
+export type SubmitMathAnswer = Omit<
+  SubmitMathAnswerInput,
+  'contractVersion'
+>;
+
+export async function submitMathAnswer(
+  command: SubmitMathAnswer,
+): Promise<AnswerOutcome> {
+  validateAggregateCommand(command);
+  if (
+    !Number.isInteger(command.questionOrdinal) ||
+    command.questionOrdinal < 0 ||
+    !Number.isInteger(command.answer) ||
+    command.answer < -2_147_483_648 ||
+    command.answer > 2_147_483_647
+  ) {
+    throw new Error('INVALID_ARGUMENT');
+  }
+  return NativeMissionAlarm.submitMathAnswer({
+    ...command,
+    contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+  });
+}
+
 function validateAggregateCommand(command: AlarmAggregateCommand): void {
   requireUuid(command.commandId, 'commandId');
   requireUuid(command.aggregateId, 'aggregateId');
@@ -165,6 +201,23 @@ export async function launchActiveInstance(
     throw new Error('INVALID_ARGUMENT');
   }
   return NativeMissionAlarm.launchActiveInstance({
+    ...request,
+    contractVersion: MISSION_ALARM_CONTRACT_VERSION,
+  });
+}
+
+export async function launchQrRegistration(
+  request: LaunchActiveInstance,
+): Promise<LaunchAck> {
+  requireUuid(request.requestId, 'requestId');
+  requireUuid(request.aggregateId, 'aggregateId');
+  if (
+    !Number.isInteger(request.expectedRevision) ||
+    request.expectedRevision < 1
+  ) {
+    throw new Error('INVALID_ARGUMENT');
+  }
+  return NativeMissionAlarm.launchQrRegistration({
     ...request,
     contractVersion: MISSION_ALARM_CONTRACT_VERSION,
   });

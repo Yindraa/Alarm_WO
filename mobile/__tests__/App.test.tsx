@@ -15,6 +15,7 @@ import {
   getContractInfo,
   getHomeSnapshot,
   launchActiveInstance,
+  launchQrRegistration,
   saveAlarmConfiguration,
 } from '../src/native/missionAlarm';
 
@@ -26,6 +27,7 @@ jest.mock('../src/native/missionAlarm', () => ({
   getAlarmEditorSnapshot: jest.fn(),
   getHomeSnapshot: jest.fn(),
   launchActiveInstance: jest.fn(),
+  launchQrRegistration: jest.fn(),
   saveAlarmConfiguration: jest.fn(),
 }));
 
@@ -36,6 +38,7 @@ const getActiveRuntimeSnapshotMock = jest.mocked(getActiveRuntimeSnapshot);
 const getAlarmEditorSnapshotMock = jest.mocked(getAlarmEditorSnapshot);
 const getHomeSnapshotMock = jest.mocked(getHomeSnapshot);
 const launchActiveInstanceMock = jest.mocked(launchActiveInstance);
+const launchQrRegistrationMock = jest.mocked(launchQrRegistration);
 const saveAlarmConfigurationMock = jest.mocked(saveAlarmConfiguration);
 
 describe('application startup recovery gate', () => {
@@ -54,6 +57,12 @@ describe('application startup recovery gate', () => {
     });
     enableAlarmMock.mockResolvedValue(commandAck(2));
     disableAlarmMock.mockResolvedValue(commandAck(3));
+    launchQrRegistrationMock.mockResolvedValue({
+      requestId: COMMAND_ID,
+      sessionId: ALARM_ID,
+      launched: true,
+      launchType: 'QR_REGISTRATION',
+    });
   });
 
   it('opens Home only after native confirms no active alarm', async () => {

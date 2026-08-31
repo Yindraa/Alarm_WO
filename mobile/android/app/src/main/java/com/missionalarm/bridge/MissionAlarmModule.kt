@@ -30,6 +30,8 @@ import com.missionalarm.core.data.EffectIdGenerator
 import com.missionalarm.core.data.EnableAlarmCommand
 import com.missionalarm.core.data.ExactAlarmScheduler
 import com.missionalarm.core.data.LeaseOwnerGenerator
+import com.missionalarm.core.data.MathMissionCoordinator
+import com.missionalarm.core.data.MathMissionException
 import com.missionalarm.core.data.MissionAlarmDatabaseFactory
 import com.missionalarm.core.data.OccurrenceIdGenerator
 import com.missionalarm.core.data.PresentationEffectRunner
@@ -38,6 +40,8 @@ import com.missionalarm.core.data.RuntimeEffectRunner
 import com.missionalarm.core.data.RuntimeStopEffectRunner
 import com.missionalarm.core.data.SaveAlarmDraftCommand
 import com.missionalarm.core.data.SchedulingEffectRunner
+import com.missionalarm.core.data.StartMissionCommand
+import com.missionalarm.core.data.SubmitMathAnswerCommand
 import com.missionalarm.core.domain.AlarmId
 import com.missionalarm.core.domain.CommandId
 import com.missionalarm.core.domain.MissionType
@@ -48,6 +52,7 @@ import com.missionalarm.scheduling.AndroidExactAlarmScheduler
 import com.missionalarm.runtime.AndroidAlarmRuntimeStarter
 import com.missionalarm.runtime.AndroidAlarmHostPresenter
 import com.missionalarm.runtime.AndroidAlarmRuntimeStopper
+import com.missionalarm.mission.camera.QrRegistrationActivity
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -60,8 +65,10 @@ class MissionAlarmModule(
   private val alarmRuntimeStarterOverride: AlarmRuntimeStarter? = null,
   private val alarmHostPresenterOverride: AlarmHostPresenter? = null,
   private val alarmRuntimeStopperOverride: AlarmRuntimeStopper? = null,
+  private val qrRegistrationLauncherOverride: ((String, String, Int) -> Unit)? = null,
 ) : NativeMissionAlarmSpec(reactContext) {
   private val launchReceipts = mutableMapOf<String, LaunchReceipt>()
+  private val qrLaunchReceipts = mutableMapOf<String, QrLaunchReceipt>()
   private val executor = Executors.newSingleThreadExecutor { runnable ->
     Thread(runnable, "mission-alarm-native").apply { isDaemon = true }
   }
@@ -134,6 +141,13 @@ class MissionAlarmModule(
         ?: AndroidAlarmRuntimeStopper(reactContext.applicationContext),
     )
   }
+  private val mathCoordinatorDelegate = lazy {
+    MathMissionCoordinator(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      effectIdGenerator = EffectIdGenerator { UUID.randomUUID().toString() },
+    )
+  }
   private val database by databaseDelegate
   private val repository by repositoryDelegate
   private val schedulingRepository by schedulingRepositoryDelegate
@@ -142,6 +156,7 @@ class MissionAlarmModule(
   private val runtimeEffectRunner by runtimeEffectRunnerDelegate
   private val presentationEffectRunner by presentationEffectRunnerDelegate
   private val runtimeStopEffectRunner by runtimeStopEffectRunnerDelegate
+  private val mathCoordinator by mathCoordinatorDelegate
 
   override fun getName(): String = NAME
 
@@ -245,6 +260,61 @@ class MissionAlarmModule(
     }
   }
 
+  override fun startMission(input: ReadableMap, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(input.requiredInt("contractVersion"))
+        val ack = mathCoordinator.start(
+          StartMissionCommand(
+            commandId = CommandId.parse(input.requiredString("commandId")),
+            instanceId = input.requiredString("aggregateId").also(UUID::fromString),
+            expectedRevision = input.requiredInt("expectedRevision").also { require(it >= 1) },
+          ),
+        )
+        promise.resolve(Arguments.createMap().apply {
+          putString("commandId", ack.commandId)
+          putString("aggregateType", "INSTANCE")
+          putString("aggregateId", ack.instanceId)
+          putInt("revision", ack.revision)
+          putDouble("appliedAtMs", ack.appliedAtMs.toDouble())
+          putBoolean("replayed", ack.replayed)
+        })
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
+  override fun submitMathAnswer(input: ReadableMap, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(input.requiredInt("contractVersion"))
+        val outcome = mathCoordinator.submitAnswer(
+          SubmitMathAnswerCommand(
+            commandId = CommandId.parse(input.requiredString("commandId")),
+            instanceId = input.requiredString("aggregateId").also(UUID::fromString),
+            expectedRevision = input.requiredInt("expectedRevision").also { require(it >= 1) },
+            questionOrdinal = input.requiredInt("questionOrdinal").also { require(it >= 0) },
+            answer = input.requiredInt("answer"),
+          ),
+        )
+        if (outcome.completed) drainReliabilityEffects()
+        promise.resolve(Arguments.createMap().apply {
+          putString("commandId", checkNotNull(outcome.commandId))
+          putString("instanceId", outcome.instanceId)
+          putInt("instanceRevision", outcome.instanceRevision)
+          putBoolean("correct", outcome.correct)
+          putInt("committedProgress", outcome.committedProgress)
+          putBoolean("completed", outcome.completed)
+          putDouble("appliedAtMs", checkNotNull(outcome.appliedAtMs).toDouble())
+          putBoolean("replayed", outcome.replayed)
+        })
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
   override fun getAlarmEditorSnapshot(
     contractVersion: Double,
     alarmId: String?,
@@ -321,6 +391,50 @@ class MissionAlarmModule(
         )
         launchReceipts[requestId] = receipt
         promise.resolve(launchAck(receipt))
+      } catch (error: Throwable) {
+        rejectMapped(promise, error)
+      }
+    }
+  }
+
+  override fun launchQrRegistration(input: ReadableMap, promise: Promise) {
+    executor.execute {
+      try {
+        requireContractVersion(input.requiredInt("contractVersion"))
+        val requestId = input.requiredString("requestId").also(UUID::fromString)
+        val alarmId = AlarmId.parse(input.requiredString("aggregateId"))
+        val expectedRevision = input.requiredInt("expectedRevision").also { require(it >= 1) }
+        qrLaunchReceipts[requestId]?.let { receipt ->
+          if (receipt.alarmId != alarmId.value || receipt.expectedRevision != expectedRevision) {
+            throw LaunchRequestReused()
+          }
+          promise.resolve(qrLaunchAck(receipt))
+          return@execute
+        }
+        val stored = repository.find(alarmId) ?: throw AlarmDraftRepositoryException.NotFound()
+        if (stored.alarm.revision != expectedRevision) {
+          throw AlarmDraftRepositoryException.RevisionConflict()
+        }
+        require(!stored.alarm.enabled) { "QR registration requires a disabled alarm" }
+        require(stored.mission.missionType == "QR") { "alarm mission is not QR" }
+        require(stored.mission.qrReferenceDigest == null) { "QR reference is already registered" }
+        val receipt = QrLaunchReceipt(
+          requestId = requestId,
+          alarmId = alarmId.value,
+          expectedRevision = expectedRevision,
+          sessionId = UUID.randomUUID().toString(),
+        )
+        qrRegistrationLauncherOverride?.invoke(requestId, alarmId.value, expectedRevision)
+          ?: reactContext.startActivity(
+            QrRegistrationActivity.intent(
+              reactContext.applicationContext,
+              requestId,
+              alarmId.value,
+              expectedRevision,
+            ),
+          )
+        qrLaunchReceipts[requestId] = receipt
+        promise.resolve(qrLaunchAck(receipt))
       } catch (error: Throwable) {
         rejectMapped(promise, error)
       }
@@ -442,6 +556,13 @@ class MissionAlarmModule(
     putString("sessionId", receipt.sessionId)
     putBoolean("launched", true)
     putString("launchType", "ACTIVE_INSTANCE")
+  }
+
+  private fun qrLaunchAck(receipt: QrLaunchReceipt) = Arguments.createMap().apply {
+    putString("requestId", receipt.requestId)
+    putString("sessionId", receipt.sessionId)
+    putBoolean("launched", true)
+    putString("launchType", "QR_REGISTRATION")
   }
 
   private fun alarmSnapshot(stored: AlarmWithMission) = Arguments.createMap().apply {
@@ -600,6 +721,15 @@ class MissionAlarmModule(
       is ActiveInstanceNotFound -> "NOT_FOUND"
       is ActiveInstanceRevisionConflict -> "CONFLICT_REVISION"
       is LaunchRequestReused -> "IDEMPOTENCY_KEY_REUSED"
+      is MathMissionException.InstanceNotFound -> "NOT_FOUND"
+      is MathMissionException.RevisionConflict -> "CONFLICT_REVISION"
+      is MathMissionException.IdempotencyKeyReused -> "IDEMPOTENCY_KEY_REUSED"
+      is MathMissionException.NotAttended,
+      is MathMissionException.WrongMissionType,
+      is MathMissionException.QuestionNotFound,
+      is MathMissionException.StaleQuestion,
+      is MathMissionException.InvalidState,
+      -> "INVALID_STATE"
       is IllegalArgumentException ->
         if (error.message?.contains("lowercase UUID v4") == true) {
           "INVALID_ARGUMENT"
@@ -620,6 +750,13 @@ class MissionAlarmModule(
   private data class LaunchReceipt(
     val requestId: String,
     val instanceId: String,
+    val expectedRevision: Int,
+    val sessionId: String,
+  )
+
+  private data class QrLaunchReceipt(
+    val requestId: String,
+    val alarmId: String,
     val expectedRevision: Int,
     val sessionId: String,
   )
