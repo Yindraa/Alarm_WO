@@ -12,12 +12,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.text.InputType
 import android.text.format.DateFormat
 import android.view.Gravity
 import android.view.View
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
@@ -31,6 +33,8 @@ import com.missionalarm.core.data.EffectIdGenerator
 import com.missionalarm.core.data.EmergencyDismissCoordinator
 import com.missionalarm.core.data.EmergencyDismissException
 import com.missionalarm.core.data.LeaseOwnerGenerator
+import com.missionalarm.core.data.MathMissionCoordinator
+import com.missionalarm.core.data.MathMissionException
 import com.missionalarm.core.data.MissionAlarmDatabaseFactory
 import com.missionalarm.core.data.PresentationEffectRunner
 import com.missionalarm.core.data.RuntimeEffectRunner
@@ -58,6 +62,10 @@ class AlarmHostActivity : Activity() {
   private lateinit var detail: TextView
   private lateinit var progress: TextView
   private lateinit var queue: TextView
+  private lateinit var mathWorkspace: LinearLayout
+  private lateinit var mathQuestion: TextView
+  private lateinit var mathAnswer: EditText
+  private lateinit var mathFeedback: TextView
   private lateinit var primaryAction: Button
   private lateinit var emergencyStatus: TextView
   private lateinit var emergencyAction: Button
@@ -148,6 +156,7 @@ class AlarmHostActivity : Activity() {
 
   private fun renderActive(snapshot: ActiveRuntimeSnapshot, recoveredDifferentInstance: Boolean) {
     activeSnapshot = snapshot
+    mathWorkspace.visibility = View.GONE
     val routeDecision = MissionRouteResolver.resolve(snapshot)
     time.text = DateFormat.getTimeFormat(this).format(Date())
     title.text = snapshot.label
@@ -217,16 +226,13 @@ class AlarmHostActivity : Activity() {
     snapshot: ActiveRuntimeSnapshot,
     destination: MissionDestination,
   ) {
+    if (destination == MissionDestination.EMBEDDED_MATH) {
+      startMathMission(snapshot)
+      return
+    }
     activeSnapshot = snapshot
     detail.text = when (destination) {
-      MissionDestination.EMBEDDED_MATH -> snapshot.mathQuestion?.let {
-        getString(
-          R.string.alarm_host_math_route_ready,
-          it.operandA,
-          operationSymbol(it.operation),
-          it.operandB,
-        )
-      } ?: getString(R.string.alarm_host_mission_recovery_required)
+      MissionDestination.EMBEDDED_MATH -> error("Math route is handled before placeholder routing")
       MissionDestination.NATIVE_PUSH_UP -> getString(R.string.alarm_host_pushup_route_ready)
       MissionDestination.NATIVE_QR -> getString(R.string.alarm_host_qr_route_ready)
     }
@@ -236,8 +242,150 @@ class AlarmHostActivity : Activity() {
     emergencyStatus.setText(R.string.alarm_host_route_safety_notice)
   }
 
+  private fun startMathMission(snapshot: ActiveRuntimeSnapshot) {
+    primaryAction.isEnabled = false
+    loading.visibility = View.VISIBLE
+    executor.execute {
+      val result = runCatching { mathCoordinator().start(snapshot.instanceId) }
+      runOnUiThread {
+        if (isFinishing || isDestroyed) return@runOnUiThread
+        loading.visibility = View.GONE
+        result.fold(
+          onSuccess = { renderMathMission(it) },
+          onFailure = { refreshFromCanonicalState() },
+        )
+      }
+    }
+  }
+
+  private fun renderMathMission(snapshot: ActiveRuntimeSnapshot, correctFeedback: Boolean = false) {
+    val question = snapshot.mathQuestion
+    if (question == null || snapshot.missionType != "MATH") {
+      renderMissionRouteRecovery(snapshot)
+      return
+    }
+    activeSnapshot = snapshot
+    detail.setText(R.string.alarm_host_math_instruction)
+    progress.text = getString(
+      R.string.alarm_host_progress,
+      snapshot.committedProgress,
+      snapshot.target,
+    )
+    mathQuestion.text = getString(
+      R.string.alarm_host_math_question,
+      question.operandA,
+      operationSymbol(question.operation),
+      question.operandB,
+    )
+    mathAnswer.text.clear()
+    mathAnswer.isEnabled = true
+    mathFeedback.setText(
+      if (correctFeedback) R.string.alarm_host_math_correct else R.string.alarm_host_math_feedback_ready,
+    )
+    mathWorkspace.visibility = View.VISIBLE
+    primaryAction.setText(R.string.alarm_host_math_submit)
+    primaryAction.isEnabled = true
+    primaryAction.setOnClickListener { submitMathAnswer(snapshot) }
+    emergencyStatus.setText(R.string.alarm_host_math_safety_notice)
+  }
+
+  private fun submitMathAnswer(snapshot: ActiveRuntimeSnapshot) {
+    val answer = mathAnswer.text.toString().trim().toIntOrNull()
+    if (answer == null) {
+      mathFeedback.setText(R.string.alarm_host_math_answer_required)
+      return
+    }
+    val ordinal = snapshot.mathQuestion?.ordinal ?: run {
+      refreshFromCanonicalState()
+      return
+    }
+    mathAnswer.isEnabled = false
+    primaryAction.isEnabled = false
+    loading.visibility = View.VISIBLE
+    executor.execute {
+      val result = runCatching {
+        mathCoordinator().submitAnswer(
+          snapshot.instanceId,
+          snapshot.revision,
+          ordinal,
+          answer,
+        )
+      }
+      val outcome = result.getOrNull()
+      val latest = if (outcome?.correct == true && !outcome.completed) {
+        runCatching { database.runtimeDao().loadActiveRuntimeSnapshot() }.getOrNull()
+      } else {
+        null
+      }
+      if (outcome?.completed == true) drainTerminalRuntimeEffects()
+      runOnUiThread {
+        if (isFinishing || isDestroyed) return@runOnUiThread
+        loading.visibility = View.GONE
+        when {
+          result.exceptionOrNull() is MathMissionException -> refreshFromCanonicalState()
+          result.isFailure -> renderMissionRouteRecovery(snapshot)
+          outcome == null -> renderMissionRouteRecovery(snapshot)
+          !outcome.correct -> {
+            mathAnswer.isEnabled = true
+            mathAnswer.selectAll()
+            mathFeedback.setText(R.string.alarm_host_math_incorrect)
+            primaryAction.isEnabled = true
+          }
+          outcome.completed && outcome.promotedInstanceId != null -> refreshFromCanonicalState()
+          outcome.completed -> renderMathSuccess(outcome.committedProgress, snapshot.target)
+          latest != null -> renderMathMission(latest, correctFeedback = true)
+          else -> refreshFromCanonicalState()
+        }
+      }
+    }
+  }
+
+  private fun renderMathSuccess(progressValue: Int, target: Int) {
+    activeSnapshot = null
+    mathWorkspace.visibility = View.GONE
+    title.setText(R.string.alarm_host_math_success_title)
+    detail.setText(R.string.alarm_host_math_success_detail)
+    progress.text = getString(R.string.alarm_host_progress, progressValue, target)
+    queue.text = ""
+    primaryAction.setText(R.string.alarm_host_close)
+    primaryAction.isEnabled = true
+    primaryAction.setOnClickListener { finish() }
+    emergencyStatus.text = ""
+    emergencyAction.visibility = View.GONE
+  }
+
+  private fun mathCoordinator() = MathMissionCoordinator(
+    database,
+    WallClock { System.currentTimeMillis() },
+    EffectIdGenerator { UUID.randomUUID().toString() },
+  )
+
+  private fun drainTerminalRuntimeEffects() {
+    val clock = WallClock { System.currentTimeMillis() }
+    val owner = LeaseOwnerGenerator { UUID.randomUUID().toString() }
+    RuntimeStopEffectRunner(
+      database,
+      clock,
+      owner,
+      AndroidAlarmRuntimeStopper(applicationContext),
+    ).drain()
+    RuntimeEffectRunner(
+      database,
+      clock,
+      owner,
+      AndroidAlarmRuntimeStarter(applicationContext),
+    ).drain()
+    PresentationEffectRunner(
+      database,
+      clock,
+      owner,
+      AndroidAlarmHostPresenter(applicationContext),
+    ).drain()
+  }
+
   private fun renderMissionRouteRecovery(snapshot: ActiveRuntimeSnapshot) {
     activeSnapshot = snapshot
+    mathWorkspace.visibility = View.GONE
     detail.setText(R.string.alarm_host_mission_recovery_required)
     primaryAction.setText(R.string.alarm_host_retry_mission)
     primaryAction.isEnabled = true
@@ -247,6 +395,7 @@ class AlarmHostActivity : Activity() {
 
   private fun renderNoActiveAlarm() {
     activeSnapshot = null
+    mathWorkspace.visibility = View.GONE
     time.text = DateFormat.getTimeFormat(this).format(Date())
     title.setText(R.string.alarm_host_no_active_title)
     detail.setText(R.string.alarm_host_no_active_detail)
@@ -261,6 +410,7 @@ class AlarmHostActivity : Activity() {
 
   private fun renderRecoveryFailure() {
     activeSnapshot = null
+    mathWorkspace.visibility = View.GONE
     time.text = DateFormat.getTimeFormat(this).format(Date())
     title.setText(R.string.alarm_host_recovery_failed_title)
     detail.setText(R.string.alarm_host_recovery_failed_detail)
@@ -276,6 +426,7 @@ class AlarmHostActivity : Activity() {
 
   private fun renderEmergencyResult() {
     activeSnapshot = null
+    mathWorkspace.visibility = View.GONE
     time.text = DateFormat.getTimeFormat(this).format(Date())
     title.setText(R.string.alarm_host_emergency_complete_title)
     detail.setText(R.string.alarm_host_emergency_complete_detail)
@@ -290,6 +441,7 @@ class AlarmHostActivity : Activity() {
 
   private fun renderEmergencyFallback() {
     activeSnapshot = null
+    mathWorkspace.visibility = View.GONE
     title.setText(R.string.alarm_host_emergency_fallback_title)
     detail.setText(R.string.alarm_host_emergency_fallback_detail)
     progress.text = ""
@@ -327,6 +479,34 @@ class AlarmHostActivity : Activity() {
     detail = bodyText(R.id.alarm_host_detail)
     progress = bodyText(R.id.alarm_host_progress)
     queue = bodyText(R.id.alarm_host_queue)
+    mathQuestion = TextView(this).apply {
+      id = R.id.alarm_host_math_question
+      textSize = 36f
+      gravity = Gravity.CENTER
+      setTypeface(typeface, Typeface.BOLD)
+      setPadding(0, 20.dp, 0, 12.dp)
+    }
+    mathAnswer = EditText(this).apply {
+      id = R.id.alarm_host_math_answer
+      inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
+      textSize = 24f
+      gravity = Gravity.CENTER
+      hint = getString(R.string.alarm_host_math_answer_hint)
+      contentDescription = getString(R.string.alarm_host_math_answer_description)
+      maxLines = 1
+    }
+    mathFeedback = bodyText(R.id.alarm_host_math_feedback).apply {
+      textSize = 15f
+      accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE
+    }
+    mathWorkspace = LinearLayout(this).apply {
+      id = R.id.alarm_host_math_workspace
+      orientation = LinearLayout.VERTICAL
+      visibility = View.GONE
+      addView(mathQuestion, matchWrap())
+      addView(mathAnswer, matchWrap())
+      addView(mathFeedback, matchWrap())
+    }
     primaryAction = Button(this).apply {
       id = R.id.alarm_host_primary_action
       isAllCaps = false
@@ -348,6 +528,7 @@ class AlarmHostActivity : Activity() {
     content.addView(detail, matchWrap())
     content.addView(progress, matchWrap())
     content.addView(queue, matchWrap())
+    content.addView(mathWorkspace, matchWrap(topMargin = 16.dp))
     content.addView(primaryAction, matchWrap(topMargin = 32.dp))
     content.addView(emergencyStatus, matchWrap())
     content.addView(emergencyAction, matchWrap(topMargin = 24.dp))

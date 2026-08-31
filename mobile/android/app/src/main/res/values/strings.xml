@@ -21,6 +21,18 @@
     <string name="alarm_host_retry_mission">Muat ulang misi</string>
     <string name="alarm_host_mission_recovery_required">Misi belum dapat dibuka dari state tersimpan. Muat ulang tanpa menghentikan alarm.</string>
     <string name="alarm_host_math_route_ready">Rute matematika siap: %1$d %2$s %3$d. Input dan verifikasi jawaban akan dihubungkan pada implementasi misi matematika.</string>
+    <string name="alarm_host_math_instruction">Jawab dengan benar untuk melanjutkan. Alarm berhenti setelah seluruh soal selesai.</string>
+    <string name="alarm_host_math_question">%1$d %2$s %3$d = ?</string>
+    <string name="alarm_host_math_answer_hint">Jawaban</string>
+    <string name="alarm_host_math_answer_description">Masukkan jawaban soal matematika</string>
+    <string name="alarm_host_math_feedback_ready">Jawaban diverifikasi langsung di perangkat.</string>
+    <string name="alarm_host_math_answer_required">Masukkan sebuah angka terlebih dahulu.</string>
+    <string name="alarm_host_math_submit">Periksa jawaban</string>
+    <string name="alarm_host_math_incorrect">Belum tepat. Coba hitung kembali.</string>
+    <string name="alarm_host_math_correct">Benar! Lanjut ke soal berikutnya.</string>
+    <string name="alarm_host_math_safety_notice">Progress jawaban benar tersimpan. Kontrol darurat tetap tersedia.</string>
+    <string name="alarm_host_math_success_title">Misi selesai</string>
+    <string name="alarm_host_math_success_detail">Semua jawaban benar. Alarm telah dihentikan.</string>
     <string name="alarm_host_pushup_route_ready">Rute native push-up siap. Kamera belum dibuka sampai workflow verifikasi push-up tersedia.</string>
     <string name="alarm_host_qr_route_ready">Rute native QR siap. Kamera belum dibuka sampai workflow pemindaian aman tersedia.</string>
     <string name="alarm_host_route_reserved">Workflow berikutnya</string>

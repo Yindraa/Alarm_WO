@@ -158,6 +158,23 @@ describe('application startup recovery gate', () => {
     expect(view.getByRole('button', { name: 'Simpan alarm' })).toBeEnabled();
   });
 
+  it('adjusts the alarm time and shows a readable weekly summary', async () => {
+    getActiveRuntimeSnapshotMock.mockResolvedValue(noActiveSnapshot());
+    const user = userEvent.setup();
+
+    const view = await render(<App />);
+    await view.findByText('Belum ada alarm');
+    await user.press(view.getByRole('button', { name: 'Tambah alarm' }));
+    await view.findByText('Buat alarm');
+
+    await user.press(view.getByRole('button', { name: 'Tambah jam' }));
+    await user.press(view.getByRole('button', { name: 'Kurangi menit' }));
+
+    expect(view.getByLabelText('Jam alarm')).toHaveDisplayValue('08');
+    expect(view.getByLabelText('Menit alarm')).toHaveDisplayValue('55');
+    expect(view.getByText('Sen–Jum • Pukul 08:55')).toBeOnTheScreen();
+  });
+
   it('saves an edited weekly draft and refreshes authoritative Home', async () => {
     getActiveRuntimeSnapshotMock.mockResolvedValue(noActiveSnapshot());
     const user = userEvent.setup();

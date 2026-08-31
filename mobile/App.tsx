@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { darkColors, lightColors, type AppColors } from './src/ui/theme';
 import {
   disableAlarm,
   enableAlarm,
@@ -183,7 +184,7 @@ function App() {
   );
 }
 
-type Colors = typeof lightColors;
+type Colors = AppColors;
 
 function RecoveryGate({
   colors,
@@ -327,17 +328,46 @@ function HomeShell({
   return (
     <View style={styles.homeContainer}>
       <View style={styles.topBar}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.homeTitle, { color: colors.text }]}
+        <View style={styles.brandGroup}>
+          <View
+            accessible={false}
+            style={[styles.brandMark, { backgroundColor: colors.hero }]}
+          >
+            <View
+              style={[styles.brandSun, { backgroundColor: colors.amber }]}
+            />
+          </View>
+          <View>
+            <Text
+              accessibilityRole="header"
+              style={[styles.homeTitle, { color: colors.text }]}
+            >
+              Mission Alarm
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+              Bangun dengan tujuan
+            </Text>
+          </View>
+        </View>
+        <View
+          accessibilityLabel="Aplikasi dapat digunakan offline"
+          style={[
+            styles.offlineBadge,
+            { backgroundColor: colors.successSurface },
+          ]}
         >
-          Mission Alarm
-        </Text>
-        <Text style={[styles.offlineLabel, { color: colors.secondary }]}>
-          Offline
-        </Text>
+          <View
+            style={[styles.offlineDot, { backgroundColor: colors.success }]}
+          />
+          <Text style={[styles.offlineLabel, { color: colors.success }]}>
+            Offline
+          </Text>
+        </View>
       </View>
-      <ScrollView contentContainerStyle={styles.homeContent}>
+      <ScrollView
+        contentContainerStyle={styles.homeContent}
+        showsVerticalScrollIndicator={false}
+      >
         {failedToggle !== null && (
           <View
             accessibilityLiveRegion="assertive"
@@ -382,34 +412,95 @@ function HomeShell({
             </View>
           </View>
         )}
-        {nextAlarm && (
-          <View style={[styles.nextCard, { backgroundColor: colors.primary }]}>
+        {nextAlarm ? (
+          <View style={[styles.nextCard, { backgroundColor: colors.hero }]}>
+            <View
+              accessible={false}
+              style={[
+                styles.heroGlowLarge,
+                { backgroundColor: colors.primary },
+              ]}
+            />
+            <View
+              accessible={false}
+              style={[styles.heroGlowSmall, { backgroundColor: colors.amber }]}
+            />
             <Text style={styles.nextEyebrow}>ALARM BERIKUTNYA</Text>
             <Text style={styles.nextTime}>
               {formatTime(nextAlarm.localTimeMinutes)}
             </Text>
-            <Text style={styles.nextLabel}>
-              {nextAlarm.label} ·{' '}
-              {missionLabel(nextAlarm.missionType, nextAlarm.target)}
+            <Text style={styles.nextTitle}>{nextAlarm.label}</Text>
+            <View style={styles.nextMetaRow}>
+              <View style={styles.nextMetaPill}>
+                <Text style={styles.nextMetaText}>
+                  Jadwal {repeatLabel(nextAlarm.repeatDaysMask)}
+                </Text>
+              </View>
+              <View style={styles.nextMetaPill}>
+                <Text style={styles.nextMetaText}>
+                  {missionSymbol(nextAlarm.missionType)}{' '}
+                  {missionLabel(nextAlarm.missionType, nextAlarm.target)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.readyRow}>
+              <View style={styles.readyDot} />
+              <Text style={styles.readyLabel}>Siap membangunkanmu</Text>
+            </View>
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.nextCard,
+              styles.quietHero,
+              { backgroundColor: colors.primarySurface },
+            ]}
+          >
+            <Text style={[styles.quietHeroEyebrow, { color: colors.primary }]}>
+              MULAI RUTINITAS
+            </Text>
+            <Text style={[styles.quietHeroTitle, { color: colors.text }]}>
+              Pagi yang fokus dimulai dari satu alarm.
+            </Text>
+            <Text style={[styles.quietHeroBody, { color: colors.secondary }]}>
+              Pilih waktu, tentukan misi, lalu biarkan Mission Alarm menjaga
+              komitmenmu.
             </Text>
           </View>
         )}
 
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Alarm
+            Alarm saya
           </Text>
-          <Text style={[styles.countLabel, { color: colors.secondary }]}>
-            {home.alarms.length}
-          </Text>
+          <View
+            style={[
+              styles.countBadge,
+              { backgroundColor: colors.primarySurface },
+            ]}
+          >
+            <Text style={[styles.countLabel, { color: colors.primary }]}>
+              {home.alarms.length}
+            </Text>
+          </View>
         </View>
 
         {home.alarms.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.heading, { color: colors.text }]}>
+            <View
+              style={[
+                styles.emptyIcon,
+                { backgroundColor: colors.primarySurface },
+              ]}
+            >
+              <Text style={[styles.emptyIconText, { color: colors.primary }]}>
+                +
+              </Text>
+            </View>
+            <Text style={[styles.emptyHeading, { color: colors.text }]}>
               Belum ada alarm
             </Text>
-            <Text style={[styles.body, { color: colors.secondary }]}>
+            <Text style={[styles.emptyBody, { color: colors.secondary }]}>
               Buat alarm pertamamu dan pilih misi yang harus diselesaikan saat
               alarm berbunyi.
             </Text>
@@ -421,7 +512,14 @@ function HomeShell({
               return (
                 <View
                   key={alarm.id}
-                  style={[styles.alarmRow, { backgroundColor: colors.surface }]}
+                  style={[
+                    styles.alarmRow,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                      shadowColor: colors.shadow,
+                    },
+                  ]}
                 >
                   <Pressable
                     accessibilityRole="button"
@@ -430,6 +528,28 @@ function HomeShell({
                     onPress={() => onOpenEditor(alarm.id)}
                     style={styles.alarmEditAction}
                   >
+                    <View
+                      style={[
+                        styles.missionIcon,
+                        {
+                          backgroundColor: missionSurface(
+                            alarm.missionType,
+                            colors,
+                          ),
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.missionIconText,
+                          {
+                            color: missionColor(alarm.missionType, colors),
+                          },
+                        ]}
+                      >
+                        {missionSymbol(alarm.missionType)}
+                      </Text>
+                    </View>
                     <View style={styles.alarmTimeColumn}>
                       <Text style={[styles.alarmTime, { color: colors.text }]}>
                         {formatTime(alarm.localTimeMinutes)}
@@ -483,9 +603,12 @@ function HomeShell({
                     {pending ? (
                       <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
-                      <Text style={styles.alarmState}>
-                        {alarm.enabled ? 'ON' : 'OFF'}
-                      </Text>
+                      <View
+                        style={[
+                          styles.toggleThumb,
+                          alarm.enabled && styles.toggleThumbEnabled,
+                        ]}
+                      />
                     )}
                   </Pressable>
                 </View>
@@ -500,13 +623,25 @@ function HomeShell({
               Riwayat terbaru
             </Text>
             {home.recentHistory.map(item => (
-              <Text
+              <View
                 key={item.instanceId}
-                style={[styles.historyItem, { color: colors.secondary }]}
+                style={[
+                  styles.historyItem,
+                  { backgroundColor: colors.surface },
+                ]}
               >
-                {item.result === 'SUCCESS' ? '✓' : '•'}{' '}
-                {missionLabel(item.missionType, item.target)}
-              </Text>
+                <View
+                  style={[
+                    styles.historyResult,
+                    { backgroundColor: colors.successSurface },
+                  ]}
+                >
+                  <Text style={{ color: colors.success }}>✓</Text>
+                </View>
+                <Text style={[styles.historyText, { color: colors.secondary }]}>
+                  {missionLabel(item.missionType, item.target)} diselesaikan
+                </Text>
+              </View>
             ))}
           </View>
         )}
@@ -515,6 +650,7 @@ function HomeShell({
         colors={colors}
         label="Tambah alarm"
         onPress={() => onOpenEditor(null)}
+        leading="＋"
       />
       <Text style={[styles.buildInfo, { color: colors.secondary }]}>
         Kontrak native v{info.contractVersion} · build {info.nativeBuildVersion}
@@ -653,21 +789,30 @@ function EditorShell({
 
   return (
     <View style={styles.editorContainer}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onBack}
-        style={styles.backButton}
-      >
-        <Text style={[styles.backLabel, { color: colors.primary }]}>
-          ‹ Kembali
-        </Text>
-      </Pressable>
-      <Text
-        accessibilityRole="header"
-        style={[styles.homeTitle, { color: colors.text }]}
-      >
-        {alarmId === null ? 'Buat alarm' : 'Edit alarm'}
-      </Text>
+      <View style={styles.editorHeader}>
+        <Pressable
+          accessibilityLabel="Kembali ke Beranda"
+          accessibilityRole="button"
+          onPress={onBack}
+          style={[
+            styles.backButton,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.backLabel, { color: colors.text }]}>‹</Text>
+        </Pressable>
+        <View style={styles.editorHeaderCopy}>
+          <Text style={[styles.editorEyebrow, { color: colors.primary }]}>
+            RUTINITAS PAGI
+          </Text>
+          <Text
+            accessibilityRole="header"
+            style={[styles.editorTitle, { color: colors.text }]}
+          >
+            {alarmId === null ? 'Buat alarm' : 'Edit alarm'}
+          </Text>
+        </View>
+      </View>
       {state.status === 'loading' && (
         <View style={styles.editorStatus}>
           <ActivityIndicator color={colors.primary} />
@@ -690,92 +835,140 @@ function EditorShell({
         <ScrollView
           contentContainerStyle={styles.editorContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <View
-            style={[styles.editorCard, { backgroundColor: colors.surface }]}
+            style={[
+              styles.timeCard,
+              { backgroundColor: colors.hero, shadowColor: colors.shadow },
+            ]}
           >
-            <Text style={[styles.fieldTitle, { color: colors.text }]}>
-              Waktu
-            </Text>
-            <View style={styles.timeInputs}>
-              <TextInput
+            <View style={styles.timeCardHeading}>
+              <View>
+                <Text style={styles.timeCardEyebrow}>PILIH WAKTU</Text>
+                <Text style={styles.timeCardTitle}>
+                  Kapan kamu ingin bangun?
+                </Text>
+              </View>
+              <View style={[styles.sunriseMark, { borderColor: colors.amber }]}>
+                <View
+                  style={[
+                    styles.sunriseCore,
+                    { backgroundColor: colors.amber },
+                  ]}
+                />
+              </View>
+            </View>
+            <View style={styles.timePickerRow}>
+              <TimeUnit
                 accessibilityLabel="Jam alarm"
-                keyboardType="number-pad"
-                maxLength={2}
-                onChangeText={hour => updateForm({ hour: digitsOnly(hour) })}
-                selectTextOnFocus
-                style={[
-                  styles.timeInput,
-                  { borderColor: colors.border, color: colors.text },
-                ]}
+                label="JAM"
+                max={23}
+                onChange={hour => updateForm({ hour })}
+                step={1}
                 value={state.form.hour}
               />
-              <Text style={[styles.timeSeparator, { color: colors.text }]}>
-                :
-              </Text>
-              <TextInput
+              <Text style={styles.timeSeparator}>:</Text>
+              <TimeUnit
                 accessibilityLabel="Menit alarm"
-                keyboardType="number-pad"
-                maxLength={2}
-                onChangeText={minute =>
-                  updateForm({ minute: digitsOnly(minute) })
-                }
-                selectTextOnFocus
-                style={[
-                  styles.timeInput,
-                  { borderColor: colors.border, color: colors.text },
-                ]}
+                label="MENIT"
+                max={59}
+                onChange={minute => updateForm({ minute })}
+                step={5}
                 value={state.form.minute}
               />
             </View>
-
-            <Text style={[styles.fieldTitle, { color: colors.text }]}>
-              Jadwal
+            <Text style={styles.timeCardHelp}>
+              Format 24 jam · sentuh angka untuk mengetik langsung
             </Text>
-            <View style={styles.choiceRow}>
-              <ChoiceChip
+          </View>
+
+          <EditorSection colors={colors} eyebrow="KAPAN" title="Jadwal alarm">
+            <View
+              style={[
+                styles.scheduleToggle,
+                { backgroundColor: colors.surfaceMuted },
+              ]}
+            >
+              <ScheduleOption
                 colors={colors}
                 label="Mingguan"
+                symbol="↻"
                 selected={state.form.scheduleKind === 'WEEKLY'}
                 onPress={() => updateForm({ scheduleKind: 'WEEKLY' })}
               />
-              <ChoiceChip
+              <ScheduleOption
                 colors={colors}
                 label="Sekali"
+                symbol="1×"
                 selected={state.form.scheduleKind === 'ONE_TIME'}
                 onPress={() => updateForm({ scheduleKind: 'ONE_TIME' })}
               />
             </View>
             {state.form.scheduleKind === 'WEEKLY' ? (
-              <View style={styles.dayRow}>
-                {WEEKDAYS.map(day => (
-                  <ChoiceChip
-                    compact
-                    colors={colors}
-                    key={day.bit}
-                    label={day.label}
-                    selected={hasDay(state.form.repeatDaysMask, day.bit)}
-                    onPress={() =>
-                      updateForm({
-                        repeatDaysMask: toggleDay(
-                          state.form.repeatDaysMask,
-                          day.bit,
-                        ),
-                      })
-                    }
-                  />
-                ))}
+              <View style={styles.weeklyPicker}>
+                <Text
+                  style={[styles.dayPickerLabel, { color: colors.secondary }]}
+                >
+                  Pilih hari aktif
+                </Text>
+                <View style={styles.dayRow}>
+                  {WEEKDAYS.map(day => (
+                    <DayOption
+                      colors={colors}
+                      key={day.bit}
+                      label={day.label}
+                      selected={hasDay(state.form.repeatDaysMask, day.bit)}
+                      onPress={() =>
+                        updateForm({
+                          repeatDaysMask: toggleDay(
+                            state.form.repeatDaysMask,
+                            day.bit,
+                          ),
+                        })
+                      }
+                    />
+                  ))}
+                </View>
               </View>
             ) : (
               <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
-                Alarm dijadwalkan pada waktu berikutnya yang tersedia, hari ini
-                atau besok.
+                Alarm hanya berbunyi satu kali pada kesempatan berikutnya.
               </Text>
             )}
+            <View
+              style={[
+                styles.scheduleSummary,
+                { backgroundColor: colors.primarySurface },
+              ]}
+            >
+              <View
+                style={[
+                  styles.scheduleSummaryIcon,
+                  { backgroundColor: colors.primary },
+                ]}
+              >
+                <Text style={styles.scheduleSummaryIconText}>✓</Text>
+              </View>
+              <View style={styles.scheduleSummaryCopy}>
+                <Text
+                  style={[
+                    styles.scheduleSummaryEyebrow,
+                    { color: colors.primary },
+                  ]}
+                >
+                  RINGKASAN
+                </Text>
+                <Text
+                  style={[styles.scheduleSummaryText, { color: colors.text }]}
+                >
+                  {scheduleSummary(state.form)}
+                </Text>
+              </View>
+            </View>
+          </EditorSection>
 
-            <Text style={[styles.fieldTitle, { color: colors.text }]}>
-              Label
-            </Text>
+          <EditorSection colors={colors} eyebrow="IDENTITAS" title="Nama alarm">
             <TextInput
               accessibilityLabel="Label alarm"
               maxLength={80}
@@ -784,32 +977,48 @@ function EditorShell({
               placeholderTextColor={colors.secondary}
               style={[
                 styles.textInput,
-                { borderColor: colors.border, color: colors.text },
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  color: colors.text,
+                },
               ]}
               value={state.form.label}
             />
+          </EditorSection>
 
-            <Text style={[styles.fieldTitle, { color: colors.text }]}>
-              Misi
-            </Text>
+          <EditorSection
+            colors={colors}
+            eyebrow="TANTANGAN"
+            title="Pilih misi bangun"
+          >
             <View style={styles.missionChoices}>
-              <ChoiceChip
+              <MissionCard
                 colors={colors}
                 label="Math"
+                description="Selesaikan soal"
+                symbol="∑"
+                tone="blue"
                 selected={state.form.missionType === 'MATH'}
                 onPress={() => updateForm({ missionType: 'MATH', target: '3' })}
               />
-              <ChoiceChip
+              <MissionCard
                 colors={colors}
                 label="Push-up"
+                description="Aktifkan tubuh"
+                symbol="P"
+                tone="amber"
                 selected={state.form.missionType === 'PUSH_UP'}
                 onPress={() =>
                   updateForm({ missionType: 'PUSH_UP', target: '10' })
                 }
               />
-              <ChoiceChip
+              <MissionCard
                 colors={colors}
                 label="QR"
+                description="Pindai kode"
+                symbol="▦"
+                tone="violet"
                 selected={state.form.missionType === 'QR'}
                 onPress={() => updateForm({ missionType: 'QR', target: '1' })}
               />
@@ -819,19 +1028,46 @@ function EditorShell({
                 <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
                   Target
                 </Text>
-                <TextInput
-                  accessibilityLabel="Target misi"
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  onChangeText={target =>
-                    updateForm({ target: digitsOnly(target) })
-                  }
+                <View
                   style={[
-                    styles.targetInput,
-                    { borderColor: colors.border, color: colors.text },
+                    styles.stepper,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
                   ]}
-                  value={state.form.target}
-                />
+                >
+                  <StepperButton
+                    colors={colors}
+                    label="Kurangi target"
+                    symbol="−"
+                    onPress={() =>
+                      updateForm({
+                        target: stepTarget(state.form.target, -1).toString(),
+                      })
+                    }
+                  />
+                  <TextInput
+                    accessibilityLabel="Target misi"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    onChangeText={target =>
+                      updateForm({ target: digitsOnly(target) })
+                    }
+                    style={[styles.targetInput, { color: colors.text }]}
+                    value={state.form.target}
+                  />
+                  <StepperButton
+                    colors={colors}
+                    label="Tambah target"
+                    symbol="+"
+                    onPress={() =>
+                      updateForm({
+                        target: stepTarget(state.form.target, 1).toString(),
+                      })
+                    }
+                  />
+                </View>
               </View>
             ) : (
               <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
@@ -839,78 +1075,326 @@ function EditorShell({
                 tahap QR berikutnya.
               </Text>
             )}
+          </EditorSection>
 
+          <EditorSection colors={colors} eyebrow="ALARM" title="Suara & status">
             <View style={styles.soundRow}>
-              <Text style={[styles.fieldTitle, { color: colors.text }]}>
-                Suara
-              </Text>
-              <Text style={[styles.fieldValue, { color: colors.secondary }]}>
-                Classic
-              </Text>
-            </View>
-            <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
-              {state.snapshot.alarm === null
-                ? 'Alarm baru disimpan nonaktif. Aktifkan dari Beranda setelah konfigurasi ditinjau.'
-                : state.snapshot.alarm.enabled
-                ? 'Alarm ini tetap aktif dan jadwal native diperbarui setelah Simpan berhasil.'
-                : 'Perubahan disimpan sebagai draft nonaktif.'}
-            </Text>
-            {(state.error ?? currentValidation) !== null && (
-              <Text
-                accessibilityLiveRegion="assertive"
-                style={[styles.editorError, { color: colors.danger }]}
+              <View
+                style={[
+                  styles.soundIcon,
+                  { backgroundColor: colors.primarySurface },
+                ]}
               >
-                {state.error ?? currentValidation}
-              </Text>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              disabled={state.saving || currentValidation !== null}
-              onPress={save}
+                <Text style={[styles.soundIconText, { color: colors.primary }]}>
+                  ♪
+                </Text>
+              </View>
+              <View style={styles.soundCopy}>
+                <Text style={[styles.fieldTitle, { color: colors.text }]}>
+                  Suara
+                </Text>
+                <Text style={[styles.fieldHelp, { color: colors.secondary }]}>
+                  Classic
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.soonBadge,
+                  { backgroundColor: colors.surfaceMuted },
+                ]}
+              >
+                <Text style={[styles.soonText, { color: colors.secondary }]}>
+                  Segera
+                </Text>
+              </View>
+            </View>
+            <View
               style={[
-                styles.editorSaveButton,
-                {
-                  backgroundColor:
-                    state.saving || currentValidation !== null
-                      ? colors.disabled
-                      : colors.primary,
-                },
+                styles.infoBanner,
+                { backgroundColor: colors.primarySurface },
               ]}
             >
-              {state.saving ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.primaryLabel}>Simpan alarm</Text>
-              )}
-            </Pressable>
-          </View>
+              <Text style={[styles.infoMark, { color: colors.primary }]}>
+                i
+              </Text>
+              <Text style={[styles.infoText, { color: colors.secondary }]}>
+                {state.snapshot.alarm === null
+                  ? 'Alarm baru disimpan nonaktif. Aktifkan dari Beranda setelah konfigurasi ditinjau.'
+                  : state.snapshot.alarm.enabled
+                  ? 'Alarm ini tetap aktif dan jadwal native diperbarui setelah Simpan berhasil.'
+                  : 'Perubahan disimpan sebagai draft nonaktif.'}
+              </Text>
+            </View>
+          </EditorSection>
+
+          {(state.error ?? currentValidation) !== null && (
+            <View
+              accessibilityLiveRegion="assertive"
+              style={[
+                styles.editorErrorBanner,
+                { backgroundColor: colors.dangerSurface },
+              ]}
+            >
+              <Text style={[styles.editorError, { color: colors.danger }]}>
+                {state.error ?? currentValidation}
+              </Text>
+            </View>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            disabled={state.saving || currentValidation !== null}
+            onPress={save}
+            style={[
+              styles.editorSaveButton,
+              {
+                backgroundColor:
+                  state.saving || currentValidation !== null
+                    ? colors.disabled
+                    : colors.primary,
+              },
+            ]}
+          >
+            {state.saving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryLabel}>Simpan alarm</Text>
+            )}
+          </Pressable>
         </ScrollView>
       )}
     </View>
   );
 }
 
-function ChoiceChip({
+function EditorSection({
+  colors,
+  eyebrow,
+  title,
+  children,
+}: Readonly<{
+  colors: Colors;
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+}>) {
+  return (
+    <View
+      style={[
+        styles.editorCard,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.shadow,
+        },
+      ]}
+    >
+      <Text style={[styles.editorSectionEyebrow, { color: colors.primary }]}>
+        {eyebrow}
+      </Text>
+      <Text style={[styles.editorSectionTitle, { color: colors.text }]}>
+        {title}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+function MissionCard({
+  colors,
+  label,
+  description,
+  symbol,
+  tone,
+  selected,
+  onPress,
+}: Readonly<{
+  colors: Colors;
+  label: string;
+  description: string;
+  symbol: string;
+  tone: 'blue' | 'amber' | 'violet';
+  selected: boolean;
+  onPress: () => void;
+}>) {
+  const accent =
+    tone === 'amber'
+      ? colors.amber
+      : tone === 'violet'
+      ? '#8B78E6'
+      : colors.primary;
+  const surface =
+    tone === 'amber'
+      ? '#FFF1D7'
+      : tone === 'violet'
+      ? '#EEEAFE'
+      : colors.primarySurface;
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={[
+        styles.missionCard,
+        {
+          backgroundColor: selected ? surface : colors.background,
+          borderColor: selected ? accent : colors.border,
+        },
+      ]}
+    >
+      <View style={[styles.missionCardIcon, { backgroundColor: accent }]}>
+        <Text style={styles.missionCardSymbol}>{symbol}</Text>
+      </View>
+      <Text style={[styles.missionCardTitle, { color: colors.text }]}>
+        {label}
+      </Text>
+      <Text
+        style={[styles.missionCardDescription, { color: colors.secondary }]}
+      >
+        {description}
+      </Text>
+      {selected && (
+        <View style={[styles.selectedMark, { backgroundColor: accent }]}>
+          <Text style={styles.selectedMarkText}>✓</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function StepperButton({
+  colors,
+  label,
+  symbol,
+  onPress,
+}: Readonly<{
+  colors: Colors;
+  label: string;
+  symbol: string;
+  onPress: () => void;
+}>) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.stepperButton}
+    >
+      <Text style={[styles.stepperSymbol, { color: colors.primary }]}>
+        {symbol}
+      </Text>
+    </Pressable>
+  );
+}
+
+function TimeUnit({
+  accessibilityLabel,
+  label,
+  max,
+  step,
+  value,
+  onChange,
+}: Readonly<{
+  accessibilityLabel: string;
+  label: string;
+  max: number;
+  step: number;
+  value: string;
+  onChange: (value: string) => void;
+}>) {
+  return (
+    <View style={styles.timeUnit}>
+      <Text style={styles.timeUnitLabel}>{label}</Text>
+      <View style={styles.timeValueBox}>
+        <TextInput
+          accessibilityLabel={accessibilityLabel}
+          keyboardType="number-pad"
+          maxLength={2}
+          onChangeText={next => onChange(digitsOnly(next))}
+          selectTextOnFocus
+          style={styles.timeInput}
+          value={value}
+        />
+      </View>
+      <View style={styles.timeAdjustRow}>
+        <Pressable
+          accessibilityLabel={`Kurangi ${label.toLowerCase()}`}
+          accessibilityRole="button"
+          onPress={() => onChange(stepClockValue(value, -step, max))}
+          style={styles.timeAdjustButton}
+        >
+          <Text style={styles.timeAdjustSymbol}>−</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel={`Tambah ${label.toLowerCase()}`}
+          accessibilityRole="button"
+          onPress={() => onChange(stepClockValue(value, step, max))}
+          style={styles.timeAdjustButton}
+        >
+          <Text style={styles.timeAdjustSymbol}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ScheduleOption({
+  colors,
+  label,
+  symbol,
+  selected,
+  onPress,
+}: Readonly<{
+  colors: Colors;
+  label: string;
+  symbol: string;
+  selected: boolean;
+  onPress: () => void;
+}>) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={[
+        styles.scheduleOption,
+        styles.scheduleOptionTransparent,
+        selected && { backgroundColor: colors.surface },
+        {
+          shadowColor: colors.shadow,
+        },
+      ]}
+    >
+      <Text style={[styles.scheduleOptionSymbol, { color: colors.primary }]}>
+        {symbol}
+      </Text>
+      <Text style={[styles.scheduleOptionLabel, { color: colors.text }]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function DayOption({
   colors,
   label,
   selected,
   onPress,
-  compact = false,
 }: Readonly<{
   colors: Colors;
   label: string;
   selected: boolean;
   onPress: () => void;
-  compact?: boolean;
 }>) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
       style={[
-        styles.choiceChip,
-        compact && styles.compactChip,
+        styles.dayOption,
         {
           backgroundColor: selected ? colors.primary : colors.background,
           borderColor: selected ? colors.primary : colors.border,
@@ -919,9 +1403,19 @@ function ChoiceChip({
     >
       <Text
         style={[
-          styles.choiceLabel,
-          { color: colors.text },
-          selected && styles.choiceSelectedLabel,
+          styles.dayOptionLabel,
+          { color: colors.secondary },
+          selected && styles.dayOptionLabelSelected,
+        ]}
+      >
+        {label.charAt(0)}
+      </Text>
+      <Text
+        accessible={false}
+        style={[
+          styles.dayOptionCaption,
+          { color: colors.secondary },
+          selected && styles.dayOptionCaptionSelected,
         ]}
       >
         {label}
@@ -1057,6 +1551,44 @@ function digitsOnly(value: string): string {
   return value.replace(/[^0-9]/g, '');
 }
 
+function stepClockValue(value: string, delta: number, max: number): string {
+  const parsed = Number(value);
+  const current = Number.isInteger(parsed) ? parsed : 0;
+  const range = max + 1;
+  const next = (((current + delta) % range) + range) % range;
+  return next.toString().padStart(2, '0');
+}
+
+function scheduleSummary(form: EditorForm): string {
+  const hour = Number(form.hour);
+  const minute = Number(form.minute);
+  const validTime =
+    form.hour !== '' &&
+    form.minute !== '' &&
+    Number.isInteger(hour) &&
+    hour >= 0 &&
+    hour <= 23 &&
+    Number.isInteger(minute) &&
+    minute >= 0 &&
+    minute <= 59;
+  if (!validTime) {
+    return 'Lengkapi waktu untuk melihat jadwal';
+  }
+  const time = `${hour.toString().padStart(2, '0')}:${minute
+    .toString()
+    .padStart(2, '0')}`;
+  if (form.scheduleKind === 'ONE_TIME') {
+    const now = new Date();
+    const todayMinutes = now.getHours() * 60 + now.getMinutes();
+    const day = hour * 60 + minute > todayMinutes ? 'Hari ini' : 'Besok';
+    return `Sekali • ${day}, pukul ${time}`;
+  }
+  if (form.repeatDaysMask === 0) {
+    return 'Pilih setidaknya satu hari aktif';
+  }
+  return `${repeatLabel(form.repeatDaysMask)} • Pukul ${time}`;
+}
+
 function hasDay(mask: number, bit: number): boolean {
   return Math.floor(mask / bit) % 2 === 1;
 }
@@ -1121,13 +1653,26 @@ function PrimaryButton({
   colors,
   label,
   onPress,
-}: Readonly<{ colors: Colors; label: string; onPress: () => void }>) {
+  leading,
+}: Readonly<{
+  colors: Colors;
+  label: string;
+  onPress: () => void;
+  leading?: string;
+}>) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       onPress={onPress}
-      style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+      style={[
+        styles.primaryButton,
+        { backgroundColor: colors.primary, shadowColor: colors.shadow },
+      ]}
     >
+      {leading !== undefined && (
+        <Text style={styles.primaryLeading}>{leading}</Text>
+      )}
       <Text style={styles.primaryLabel}>{label}</Text>
     </Pressable>
   );
@@ -1166,31 +1711,30 @@ function missionLabel(type: string, target: number): string {
   return type === 'QR' ? name : `${name} · ${target}`;
 }
 
-const lightColors = {
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  text: '#0F172A',
-  secondary: '#475569',
-  primary: '#0369A1',
-  border: '#CBD5E1',
-  disabled: '#94A3B8',
-  danger: '#B91C1C',
-  dangerSurface: '#FEE2E2',
-  success: '#166534',
-};
+function missionSymbol(type: string): string {
+  return type === 'PUSH_UP' ? 'P' : type === 'QR' ? '▦' : '∑';
+}
 
-const darkColors: Colors = {
-  background: '#07111F',
-  surface: '#111E2E',
-  text: '#F8FAFC',
-  secondary: '#CBD5E1',
-  primary: '#0369A1',
-  border: '#334155',
-  disabled: '#475569',
-  danger: '#F87171',
-  dangerSurface: '#3F151D',
-  success: '#4ADE80',
-};
+function missionColor(type: string, colors: Colors): string {
+  return type === 'PUSH_UP'
+    ? '#B96D00'
+    : type === 'QR'
+    ? '#7055CA'
+    : colors.primary;
+}
+
+function missionSurface(type: string, colors: Colors): string {
+  return type === 'PUSH_UP'
+    ? '#FFF1D7'
+    : type === 'QR'
+    ? '#EEEAFE'
+    : colors.primarySurface;
+}
+
+function stepTarget(value: string, delta: number): number {
+  const current = Number(value);
+  return Math.max(1, (Number.isFinite(current) ? current : 1) + delta);
+}
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
@@ -1200,37 +1744,156 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  homeContainer: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
-  homeContent: { paddingBottom: 24 },
+  homeContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  homeContent: { paddingBottom: 20 },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 22,
+  },
+  brandGroup: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  brandMark: {
+    borderRadius: 15,
+    height: 46,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 46,
+  },
+  brandSun: {
+    alignSelf: 'center',
+    borderRadius: 999,
+    height: 16,
+    marginTop: 10,
+    width: 16,
   },
   title: { fontSize: 32, fontWeight: '700', marginBottom: 40 },
-  homeTitle: { fontSize: 28, fontWeight: '700' },
-  offlineLabel: { fontSize: 14, fontWeight: '600' },
-  statusGroup: { alignItems: 'center', gap: 16, maxWidth: 480 },
-  nextCard: { borderRadius: 20, marginBottom: 28, padding: 24 },
-  nextEyebrow: {
-    color: '#E0F2FE',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
+  homeTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
+  headerSubtitle: { fontSize: 12, marginTop: 2 },
+  offlineBadge: {
+    alignItems: 'center',
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 32,
+    paddingHorizontal: 10,
   },
-  nextTime: { color: '#FFFFFF', fontSize: 38, fontWeight: '800', marginTop: 8 },
-  nextLabel: { color: '#E0F2FE', fontSize: 15, marginTop: 4 },
+  offlineDot: { borderRadius: 999, height: 7, width: 7 },
+  offlineLabel: { fontSize: 12, fontWeight: '700' },
+  statusGroup: { alignItems: 'center', gap: 16, maxWidth: 480 },
+  nextCard: {
+    borderRadius: 26,
+    marginBottom: 28,
+    overflow: 'hidden',
+    padding: 24,
+  },
+  heroGlowLarge: {
+    borderRadius: 999,
+    height: 190,
+    opacity: 0.28,
+    position: 'absolute',
+    right: -62,
+    top: -70,
+    width: 190,
+  },
+  heroGlowSmall: {
+    borderRadius: 999,
+    height: 54,
+    opacity: 0.8,
+    position: 'absolute',
+    right: 32,
+    top: 31,
+    width: 54,
+  },
+  nextEyebrow: {
+    color: '#BFDDF8',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  nextTime: {
+    color: '#FFFFFF',
+    fontSize: 52,
+    fontWeight: '800',
+    letterSpacing: -2,
+    marginTop: 10,
+  },
+  nextTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  nextMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 18,
+  },
+  nextMetaPill: {
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  nextMetaText: { color: '#EAF4FE', fontSize: 12, fontWeight: '700' },
+  readyRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 18,
+  },
+  readyDot: {
+    backgroundColor: '#68DDB4',
+    borderRadius: 999,
+    height: 8,
+    width: 8,
+  },
+  readyLabel: { color: '#DDF4EB', fontSize: 12, fontWeight: '700' },
+  quietHero: { minHeight: 204 },
+  quietHeroEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  quietHeroTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    lineHeight: 32,
+    marginTop: 14,
+    maxWidth: 290,
+  },
+  quietHeroBody: { fontSize: 14, lineHeight: 21, marginTop: 10, maxWidth: 300 },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  sectionTitle: { fontSize: 20, fontWeight: '700' },
-  countLabel: { fontSize: 14, fontWeight: '600' },
-  emptyCard: { borderRadius: 20, gap: 12, padding: 24 },
-  homeErrorCard: { borderRadius: 16, gap: 8, marginBottom: 20, padding: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  countBadge: {
+    alignItems: 'center',
+    borderRadius: 999,
+    justifyContent: 'center',
+    minHeight: 25,
+    minWidth: 25,
+  },
+  countLabel: { fontSize: 12, fontWeight: '800' },
+  emptyCard: {
+    alignItems: 'center',
+    borderRadius: 22,
+    gap: 10,
+    padding: 28,
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 4,
+    width: 56,
+  },
+  emptyIconText: { fontSize: 28, fontWeight: '400' },
+  emptyHeading: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  emptyBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    maxWidth: 300,
+    textAlign: 'center',
+  },
+  homeErrorCard: { borderRadius: 18, gap: 8, marginBottom: 20, padding: 16 },
   homeErrorTitle: { fontSize: 15, fontWeight: '700' },
   homeErrorBody: { fontSize: 14, lineHeight: 20 },
   homeErrorActions: { flexDirection: 'row', justifyContent: 'flex-end' },
@@ -1243,110 +1906,377 @@ const styles = StyleSheet.create({
   alarmList: { gap: 12 },
   alarmRow: {
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 2,
     flexDirection: 'row',
-    minHeight: 80,
-    padding: 16,
+    minHeight: 94,
+    padding: 14,
+    shadowOffset: { height: 4, width: 0 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
   },
   alarmEditAction: { alignItems: 'center', flex: 1, flexDirection: 'row' },
-  alarmTimeColumn: { width: 82 },
-  alarmTime: { fontSize: 22, fontWeight: '700' },
+  missionIcon: {
+    alignItems: 'center',
+    borderRadius: 14,
+    height: 46,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 46,
+  },
+  missionIconText: { fontSize: 18, fontWeight: '900' },
+  alarmTimeColumn: { width: 68 },
+  alarmTime: { fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
   alarmSchedule: { fontSize: 12, marginTop: 2 },
-  alarmDetail: { flex: 1, paddingHorizontal: 10 },
-  alarmLabel: { fontSize: 16, fontWeight: '700' },
+  alarmDetail: { flex: 1, paddingHorizontal: 6 },
+  alarmLabel: { fontSize: 15, fontWeight: '800' },
   alarmMission: { fontSize: 13, marginTop: 4 },
   alarmToggle: {
     alignItems: 'center',
     borderRadius: 999,
-    height: 38,
+    height: 32,
     justifyContent: 'center',
-    minWidth: 58,
+    minWidth: 52,
+    paddingHorizontal: 3,
   },
-  alarmState: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  toggleThumb: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    height: 26,
+    width: 26,
+  },
+  toggleThumbEnabled: { alignSelf: 'flex-end' },
   historySection: { gap: 10, marginTop: 28 },
-  historyItem: { fontSize: 14 },
+  historyItem: {
+    alignItems: 'center',
+    borderRadius: 16,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 52,
+    paddingHorizontal: 14,
+  },
+  historyResult: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  historyText: { flex: 1, fontSize: 13, fontWeight: '600' },
   heading: { fontSize: 20, fontWeight: '600', textAlign: 'center' },
   body: { fontSize: 16, lineHeight: 24, textAlign: 'center' },
   primaryButton: {
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 18,
+    elevation: 3,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
     marginVertical: 12,
-    padding: 16,
+    minHeight: 56,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 9,
   },
+  primaryLeading: { color: '#FFFFFF', fontSize: 23, fontWeight: '400' },
   primaryLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   buildInfo: { fontSize: 12, paddingBottom: 8, textAlign: 'center' },
-  editorContainer: { flex: 1, padding: 24 },
-  backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 48,
-    justifyContent: 'center',
+  editorContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 12 },
+  editorHeader: { alignItems: 'center', flexDirection: 'row', gap: 14 },
+  editorHeaderCopy: { flex: 1 },
+  editorEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  editorTitle: {
+    fontSize: 25,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginTop: 2,
   },
-  backLabel: { fontSize: 16, fontWeight: '700' },
+  backButton: {
+    alignItems: 'center',
+    borderRadius: 15,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  backLabel: { fontSize: 31, fontWeight: '300', lineHeight: 34, marginTop: -3 },
   editorStatus: {
     alignItems: 'center',
     flex: 1,
     gap: 16,
     justifyContent: 'center',
   },
-  editorContent: { paddingBottom: 32 },
-  editorCard: { borderRadius: 20, gap: 12, marginTop: 24, padding: 20 },
-  fieldTitle: { fontSize: 16, fontWeight: '700', marginTop: 6 },
+  editorContent: { gap: 14, paddingBottom: 32, paddingTop: 22 },
+  timeCard: {
+    borderRadius: 26,
+    elevation: 3,
+    padding: 22,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 0.13,
+    shadowRadius: 10,
+  },
+  timeCardEyebrow: {
+    color: '#BFDDF8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  timeCardHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  timeCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginTop: 3,
+  },
+  sunriseMark: {
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    height: 36,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+    width: 44,
+  },
+  sunriseCore: {
+    borderRadius: 999,
+    height: 25,
+    marginBottom: -12,
+    width: 25,
+  },
+  timeCardHelp: {
+    color: '#BFDDF8',
+    fontSize: 11,
+    marginTop: 14,
+    textAlign: 'center',
+  },
+  editorCard: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 1,
+    gap: 12,
+    padding: 20,
+    shadowOffset: { height: 3, width: 0 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  editorSectionEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  editorSectionTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    marginBottom: 2,
+  },
+  fieldTitle: { fontSize: 15, fontWeight: '700' },
   fieldHelp: { fontSize: 13, lineHeight: 19 },
-  fieldValue: { fontSize: 15, fontWeight: '600' },
-  timeInputs: {
+  timePickerRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
+    marginTop: 22,
+  },
+  timeUnit: { alignItems: 'center' },
+  timeUnitLabel: {
+    color: '#BFDDF8',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 7,
+  },
+  timeValueBox: {
+    backgroundColor: 'rgba(255,255,255,0.11)',
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   timeInput: {
-    borderRadius: 12,
-    borderWidth: 1,
-    fontSize: 32,
+    color: '#FFFFFF',
+    fontSize: 46,
     fontWeight: '800',
-    height: 60,
+    height: 76,
+    letterSpacing: -1,
+    padding: 0,
     textAlign: 'center',
-    width: 82,
+    width: 104,
   },
-  timeSeparator: { fontSize: 32, fontWeight: '800', marginHorizontal: 8 },
-  textInput: {
+  timeSeparator: {
+    color: '#FFFFFF',
+    fontSize: 38,
+    fontWeight: '800',
+    marginHorizontal: 10,
+    marginTop: 12,
+  },
+  timeAdjustRow: { flexDirection: 'row', gap: 7, marginTop: 8 },
+  timeAdjustButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.11)',
     borderRadius: 12,
+    height: 44,
+    justifyContent: 'center',
+    width: 48,
+  },
+  timeAdjustSymbol: { color: '#FFFFFF', fontSize: 21, fontWeight: '600' },
+  scheduleToggle: {
+    borderRadius: 15,
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+  },
+  scheduleOption: {
+    alignItems: 'center',
+    borderRadius: 12,
+    elevation: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 52,
+    shadowOffset: { height: 2, width: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  scheduleOptionTransparent: { backgroundColor: 'transparent' },
+  scheduleOptionSymbol: { fontSize: 16, fontWeight: '900' },
+  scheduleOptionLabel: { fontSize: 14, fontWeight: '800' },
+  weeklyPicker: { gap: 9, marginTop: 4 },
+  dayPickerLabel: { fontSize: 12, fontWeight: '600' },
+  dayRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  dayOption: {
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    height: 58,
+    justifyContent: 'center',
+    width: 38,
+  },
+  dayOptionLabel: { fontSize: 15, fontWeight: '900' },
+  dayOptionLabelSelected: { color: '#FFFFFF' },
+  dayOptionCaption: { fontSize: 8, fontWeight: '700', marginTop: 2 },
+  dayOptionCaptionSelected: { color: '#DDEEFF' },
+  scheduleSummary: {
+    alignItems: 'center',
+    borderRadius: 15,
+    flexDirection: 'row',
+    gap: 11,
+    padding: 13,
+  },
+  scheduleSummaryIcon: {
+    alignItems: 'center',
+    borderRadius: 11,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  scheduleSummaryIconText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  scheduleSummaryCopy: { flex: 1 },
+  scheduleSummaryEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
+  scheduleSummaryText: { fontSize: 13, fontWeight: '700', marginTop: 2 },
+  textInput: {
+    borderRadius: 14,
     borderWidth: 1,
     fontSize: 16,
-    minHeight: 50,
-    paddingHorizontal: 14,
-  },
-  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  missionChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  dayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  choiceChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 42,
-    justifyContent: 'center',
+    minHeight: 54,
     paddingHorizontal: 16,
   },
-  compactChip: { minHeight: 38, paddingHorizontal: 11 },
-  choiceLabel: { fontSize: 14, fontWeight: '700' },
-  choiceSelectedLabel: { color: '#FFFFFF' },
+  missionChoices: { flexDirection: 'row', gap: 8 },
+  missionCard: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    flex: 1,
+    minHeight: 132,
+    padding: 12,
+  },
+  missionCardIcon: {
+    alignItems: 'center',
+    borderRadius: 11,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  missionCardSymbol: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  missionCardTitle: { fontSize: 14, fontWeight: '800', marginTop: 12 },
+  missionCardDescription: { fontSize: 10, lineHeight: 14, marginTop: 2 },
+  selectedMark: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 20,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 20,
+  },
+  selectedMarkText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   targetRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
-  targetInput: {
-    borderRadius: 10,
+  stepper: {
+    alignItems: 'center',
+    borderRadius: 14,
     borderWidth: 1,
+    flexDirection: 'row',
+    minHeight: 48,
+  },
+  stepperButton: {
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  stepperSymbol: { fontSize: 23, fontWeight: '700' },
+  targetInput: {
     fontSize: 17,
-    fontWeight: '700',
-    height: 44,
+    fontWeight: '800',
+    height: 48,
+    padding: 0,
     textAlign: 'center',
-    width: 72,
+    width: 42,
   },
   soundRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
+  },
+  soundIcon: {
+    alignItems: 'center',
+    borderRadius: 13,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  soundIconText: { fontSize: 20, fontWeight: '800' },
+  soundCopy: { flex: 1, marginLeft: 12 },
+  soonBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  soonText: { fontSize: 11, fontWeight: '700' },
+  infoBanner: {
+    alignItems: 'flex-start',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 10,
+    padding: 13,
+  },
+  infoMark: {
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'center',
+    width: 16,
+  },
+  infoText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  editorErrorBanner: {
+    borderRadius: 14,
+    padding: 13,
   },
   editorError: {
     fontSize: 13,
@@ -1356,10 +2286,10 @@ const styles = StyleSheet.create({
   },
   editorSaveButton: {
     alignItems: 'center',
-    borderRadius: 14,
-    minHeight: 52,
+    borderRadius: 18,
+    minHeight: 56,
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 2,
   },
 });
 

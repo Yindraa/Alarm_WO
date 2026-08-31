@@ -57,6 +57,112 @@ abstract class RuntimeDao {
 
   @Query(
     """
+    SELECT * FROM math_question
+    WHERE instance_id = :instanceId AND ordinal = :ordinal
+    """,
+  )
+  abstract fun findMathQuestion(instanceId: String, ordinal: Int): MathQuestionEntity?
+
+  @Query(
+    """
+    UPDATE alarm_instance
+    SET revision = revision + 1, runtime_state = 'MISSION_LOCKED', updated_at_ms = :updatedAtMs
+    WHERE id = :instanceId AND revision = :expectedRevision AND attention_slot = 1
+      AND runtime_state = 'TRIGGERED'
+    """,
+  )
+  abstract fun lockMission(
+    instanceId: String,
+    expectedRevision: Int,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE instance_mission
+    SET runtime_status = 'IN_PROGRESS', updated_at_ms = :updatedAtMs
+    WHERE instance_id = :instanceId AND mission_type = 'MATH' AND runtime_status = 'READY'
+    """,
+  )
+  abstract fun startMathMissionState(instanceId: String, updatedAtMs: Long): Int
+
+  @Query(
+    """
+    UPDATE alarm_instance
+    SET revision = revision + 1, runtime_state = 'MISSION_IN_PROGRESS', updated_at_ms = :updatedAtMs
+    WHERE id = :instanceId AND revision = :expectedRevision AND attention_slot = 1
+      AND runtime_state = 'MISSION_LOCKED'
+    """,
+  )
+  abstract fun startMission(
+    instanceId: String,
+    expectedRevision: Int,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE math_question
+    SET answered = 1, answered_at_ms = :answeredAtMs
+    WHERE instance_id = :instanceId AND ordinal = :ordinal AND answered = 0
+    """,
+  )
+  abstract fun markMathQuestionAnswered(
+    instanceId: String,
+    ordinal: Int,
+    answeredAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE instance_mission
+    SET committed_progress = :nextProgress, runtime_status = :runtimeStatus,
+      updated_at_ms = :updatedAtMs
+    WHERE instance_id = :instanceId AND mission_type = 'MATH'
+      AND committed_progress = :expectedProgress AND runtime_status = 'IN_PROGRESS'
+    """,
+  )
+  abstract fun advanceMathProgress(
+    instanceId: String,
+    expectedProgress: Int,
+    nextProgress: Int,
+    runtimeStatus: String,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE alarm_instance
+    SET revision = revision + 1, updated_at_ms = :updatedAtMs
+    WHERE id = :instanceId AND revision = :expectedRevision AND attention_slot = 1
+      AND runtime_state = 'MISSION_IN_PROGRESS'
+    """,
+  )
+  abstract fun commitMissionProgressRevision(
+    instanceId: String,
+    expectedRevision: Int,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE alarm_instance
+    SET revision = revision + 1, runtime_state = 'TERMINAL', attention_slot = NULL,
+      terminal_at_ms = :terminalAtMs, terminal_result = 'SUCCESS',
+      dismiss_method = 'VERIFIED_MISSION', error_reason_code = NULL,
+      updated_at_ms = :terminalAtMs
+    WHERE id = :instanceId AND revision = :expectedRevision AND attention_slot = 1
+      AND runtime_state = 'MISSION_IN_PROGRESS'
+    """,
+  )
+  abstract fun completeVerifiedMission(
+    instanceId: String,
+    expectedRevision: Int,
+    terminalAtMs: Long,
+  ): Int
+
+  @Query(
+    """
     SELECT COUNT(*) FROM alarm_instance
     WHERE runtime_state = 'PENDING_ATTENTION' AND attention_slot IS NULL
     """,
