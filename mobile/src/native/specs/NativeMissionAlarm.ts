@@ -15,8 +15,6 @@ export type MissionConfigSnapshot = Readonly<{
   pushupProfileVersion: string | null;
   mathOperationsMask: CodegenTypes.Int32 | null;
   mathGeneratorVersion: string | null;
-  qrRegistered: boolean;
-  qrDigestVersion: string | null;
 }>;
 
 export type AlarmSnapshot = Readonly<{
@@ -215,7 +213,6 @@ export interface Spec extends TurboModule {
   deleteAlarm(input: AggregateCommandMeta): Promise<CommandAck>;
   startMission(input: AggregateCommandMeta): Promise<CommandAck>;
   submitMathAnswer(input: SubmitMathAnswerInput): Promise<AnswerOutcome>;
-  launchQrRegistration(input: NativeLaunchRequest): Promise<LaunchAck>;
   launchActiveInstance(input: NativeLaunchRequest): Promise<LaunchAck>;
 }
 

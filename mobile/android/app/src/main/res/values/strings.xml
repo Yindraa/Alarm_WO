@@ -15,7 +15,7 @@
     </plurals>
     <string name="alarm_host_start_math">Mulai misi matematika</string>
     <string name="alarm_host_start_pushup">Mulai misi push-up</string>
-    <string name="alarm_host_start_qr">Mulai misi QR</string>
+    <string name="alarm_host_start_qr">Mulai pindai kode</string>
     <string name="alarm_host_start_mission">Mulai misi</string>
     <string name="alarm_host_continue_mission">Lanjutkan misi</string>
     <string name="alarm_host_retry_mission">Muat ulang misi</string>
@@ -35,9 +35,10 @@
     <string name="alarm_host_math_safety_notice">Progress jawaban benar tersimpan. Kontrol darurat tetap tersedia.</string>
     <string name="alarm_host_math_success_title">Misi selesai</string>
     <string name="alarm_host_math_success_detail">Semua jawaban benar. Alarm telah dihentikan.</string>
-    <string name="alarm_host_pushup_route_ready">Rute native push-up siap. Kamera belum dibuka sampai workflow verifikasi push-up tersedia.</string>
-    <string name="alarm_host_qr_route_ready">Rute native QR siap. Kamera belum dibuka sampai workflow pemindaian aman tersedia.</string>
-    <string name="alarm_host_route_reserved">Workflow berikutnya</string>
+    <string name="alarm_host_scan_success_title">Kode ditemukan</string>
+    <string name="alarm_host_scan_success_detail">QR atau barcode valid terdeteksi. Alarm telah dimatikan.</string>
+    <string name="alarm_host_pushup_success_title">Push-up selesai</string>
+    <string name="alarm_host_pushup_success_detail">Target repetisi terverifikasi. Alarm telah dimatikan.</string>
     <string name="alarm_host_route_safety_notice">Alarm tetap aktif dan kontrol darurat tetap tersedia selama workflow misi belum tersambung.</string>
     <string name="alarm_host_recovery_ready">Alarm aktif berhasil dipulihkan dari penyimpanan.</string>
     <string name="alarm_host_newer_instance_recovered">Alarm yang lebih baru sedang aktif dan telah dipulihkan dari penyimpanan.</string>
@@ -49,7 +50,7 @@
     <string name="alarm_host_retry">Coba lagi</string>
     <string name="mission_name_math">Matematika</string>
     <string name="mission_name_pushup">Push-up</string>
-    <string name="mission_name_qr">Pindai QR</string>
+    <string name="mission_name_qr">Scan QR/Barcode</string>
     <string name="mission_name_unknown">Tidak dikenal</string>
     <string name="alarm_host_emergency_action">Darurat: hentikan alarm</string>
     <string name="alarm_host_emergency_action_description">Buka penghentian darurat. Alarm hanya berhenti setelah tombol ditahan selama lima detik.</string>

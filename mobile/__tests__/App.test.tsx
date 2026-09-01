@@ -15,7 +15,6 @@ import {
   getContractInfo,
   getHomeSnapshot,
   launchActiveInstance,
-  launchQrRegistration,
   saveAlarmConfiguration,
 } from '../src/native/missionAlarm';
 
@@ -27,7 +26,6 @@ jest.mock('../src/native/missionAlarm', () => ({
   getAlarmEditorSnapshot: jest.fn(),
   getHomeSnapshot: jest.fn(),
   launchActiveInstance: jest.fn(),
-  launchQrRegistration: jest.fn(),
   saveAlarmConfiguration: jest.fn(),
 }));
 
@@ -38,7 +36,6 @@ const getActiveRuntimeSnapshotMock = jest.mocked(getActiveRuntimeSnapshot);
 const getAlarmEditorSnapshotMock = jest.mocked(getAlarmEditorSnapshot);
 const getHomeSnapshotMock = jest.mocked(getHomeSnapshot);
 const launchActiveInstanceMock = jest.mocked(launchActiveInstance);
-const launchQrRegistrationMock = jest.mocked(launchQrRegistration);
 const saveAlarmConfigurationMock = jest.mocked(saveAlarmConfiguration);
 
 describe('application startup recovery gate', () => {
@@ -57,12 +54,6 @@ describe('application startup recovery gate', () => {
     });
     enableAlarmMock.mockResolvedValue(commandAck(2));
     disableAlarmMock.mockResolvedValue(commandAck(3));
-    launchQrRegistrationMock.mockResolvedValue({
-      requestId: COMMAND_ID,
-      sessionId: ALARM_ID,
-      launched: true,
-      launchType: 'QR_REGISTRATION',
-    });
   });
 
   it('opens Home only after native confirms no active alarm', async () => {
@@ -182,6 +173,34 @@ describe('application startup recovery gate', () => {
     expect(view.getByLabelText('Jam alarm')).toHaveDisplayValue('08');
     expect(view.getByLabelText('Menit alarm')).toHaveDisplayValue('55');
     expect(view.getByText('Sen–Jum • Pukul 08:55')).toBeOnTheScreen();
+  });
+
+  it('configures Scan without asking the user to register a code', async () => {
+    getActiveRuntimeSnapshotMock.mockResolvedValue(noActiveSnapshot());
+    const user = userEvent.setup();
+
+    const view = await render(<App />);
+    await view.findByText('Belum ada alarm');
+    await user.press(view.getByRole('button', { name: 'Tambah alarm' }));
+    await view.findByText('Buat alarm');
+    await user.press(view.getByRole('radio', { name: 'Scan' }));
+
+    expect(view.getByText('Tidak perlu mendaftarkan kode')).toBeOnTheScreen();
+    expect(view.queryByLabelText('Target misi')).not.toBeOnTheScreen();
+    expect(view.queryByRole('button', { name: /Pindai/ })).not.toBeOnTheScreen();
+
+    await user.press(view.getByRole('button', { name: 'Simpan alarm' }));
+    await waitFor(() =>
+      expect(saveAlarmConfigurationMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          missionType: 'QR',
+          target: 1,
+          pushupProfileVersion: null,
+          mathOperationsMask: null,
+          mathGeneratorVersion: null,
+        }),
+      ),
+    );
   });
 
   it('saves an edited weekly draft and refreshes authoritative Home', async () => {
@@ -572,8 +591,8 @@ function newEditorSnapshot() {
 }
 
 const CONTRACT_INFO = {
-  contractVersion: 1,
-  minimumClientContractVersion: 1,
+  contractVersion: 2,
+  minimumClientContractVersion: 2,
   moduleName: 'NativeMissionAlarm',
   nativeBuildVersion: '1.0',
 };

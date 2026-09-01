@@ -119,7 +119,7 @@ class AlarmSchedulingRepositoryTest {
   }
 
   @Test
-  fun unregisteredQrAlarmIsRejectedBeforeMutation() {
+  fun scanMissionAlarmCanBeEnabledWithoutRegistration() {
     drafts.save(
       weeklyDraft().copy(
         missionType = MissionType.QR,
@@ -129,13 +129,12 @@ class AlarmSchedulingRepositoryTest {
       ),
     )
 
-    assertThrows(AlarmSchedulingRepositoryException.QrNotRegistered::class.java) {
-      scheduling.enable(enableCommand(ENABLE_COMMAND_ID))
-    }
+    val enabled = scheduling.enable(enableCommand(ENABLE_COMMAND_ID))
 
-    assertFalse(drafts.find(AlarmId.parse(ALARM_ID))!!.alarm.enabled)
-    assertEquals(0, scalarLong("SELECT COUNT(*) FROM alarm_occurrence"))
-    assertEquals(0, scalarLong("SELECT COUNT(*) FROM runtime_effect"))
+    assertEquals(2, enabled.revision)
+    assertTrue(drafts.find(AlarmId.parse(ALARM_ID))!!.alarm.enabled)
+    assertEquals(1, scalarLong("SELECT COUNT(*) FROM alarm_occurrence"))
+    assertEquals(2, scalarLong("SELECT COUNT(*) FROM runtime_effect"))
   }
 
   @Test

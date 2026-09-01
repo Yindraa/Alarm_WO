@@ -4,7 +4,6 @@ import com.missionalarm.core.domain.AlarmId
 import com.missionalarm.core.domain.AlarmSchedule
 import com.missionalarm.core.domain.CommandId
 import com.missionalarm.core.domain.LocalTimeMinutes
-import com.missionalarm.core.domain.MissionType
 import com.missionalarm.core.domain.OccurrenceId
 import com.missionalarm.core.domain.OccurrenceIdentity
 import com.missionalarm.core.domain.OccurrenceTime
@@ -31,7 +30,6 @@ sealed class AlarmSchedulingRepositoryException(message: String) : IllegalStateE
   class AlreadyDisabled : AlarmSchedulingRepositoryException("alarm is already disabled")
   class ActiveInstanceExists :
     AlarmSchedulingRepositoryException("alarm has a non-terminal instance")
-  class QrNotRegistered : AlarmSchedulingRepositoryException("QR reference is not registered")
   class ScheduleExpired : AlarmSchedulingRepositoryException("one-time schedule has expired")
   class PendingOccurrenceExists :
     AlarmSchedulingRepositoryException("disabled alarm still has a pending occurrence")
@@ -79,9 +77,6 @@ class AlarmSchedulingRepository(
         throw AlarmSchedulingRepositoryException.RevisionConflict()
       }
       if (stored.alarm.enabled) throw AlarmSchedulingRepositoryException.AlreadyEnabled()
-      if (stored.mission.missionType == "QR" && stored.mission.qrReferenceDigest == null) {
-        throw AlarmSchedulingRepositoryException.QrNotRegistered()
-      }
       if (database.runtimeDao().findNextOccurrence(command.alarmId.value) != null) {
         throw AlarmSchedulingRepositoryException.PendingOccurrenceExists()
       }
@@ -136,10 +131,7 @@ class AlarmSchedulingRepository(
       }
       if (!stored.alarm.enabled) throw AlarmSchedulingRepositoryException.AlreadyDisabled()
 
-      val replacementMission = command.toEnabledMission(alarmId, stored.mission)
-      if (replacementMission.missionType == "QR" && replacementMission.qrReferenceDigest == null) {
-        throw AlarmSchedulingRepositoryException.QrNotRegistered()
-      }
+      val replacementMission = command.toEnabledMission(alarmId)
       val nowMs = checkedNowMs()
       val revision = expectedRevision.next()
       val next = nextOccurrence(command.toSchedule(), nowMs)
@@ -419,9 +411,7 @@ class AlarmSchedulingRepository(
 
   private fun SaveAlarmDraftCommand.toEnabledMission(
     alarmId: AlarmId,
-    current: AlarmMissionConfigEntity,
   ): AlarmMissionConfigEntity {
-    val preserveQrRegistration = missionType == MissionType.QR && current.missionType == "QR"
     return AlarmMissionConfigEntity(
       alarmId = alarmId.value,
       missionType = missionType.name,
@@ -430,9 +420,9 @@ class AlarmSchedulingRepository(
       pushupProfileVersion = pushupProfileVersion,
       mathOperationsMask = mathOperationsMask,
       mathGeneratorVersion = mathGeneratorVersion,
-      qrReferenceDigest = current.qrReferenceDigest.takeIf { preserveQrRegistration },
-      qrDigestVersion = current.qrDigestVersion.takeIf { preserveQrRegistration },
-      qrKeyAlias = current.qrKeyAlias.takeIf { preserveQrRegistration },
+      qrReferenceDigest = null,
+      qrDigestVersion = null,
+      qrKeyAlias = null,
     )
   }
 

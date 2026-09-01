@@ -7,7 +7,6 @@ import {
   getAlarmEditorSnapshot,
   getHomeSnapshot,
   launchActiveInstance,
-  launchQrRegistration,
   MISSION_ALARM_CONTRACT_VERSION,
   saveAlarmConfiguration,
   startMission,
@@ -29,7 +28,6 @@ jest.mock('../src/native/specs/NativeMissionAlarm', () => ({
     startMission: jest.fn(),
     submitMathAnswer: jest.fn(),
     launchActiveInstance: jest.fn(),
-    launchQrRegistration: jest.fn(),
   },
 }));
 
@@ -64,28 +62,6 @@ describe('mission alarm native wrapper', () => {
       saveAlarmConfiguration({ ...validDraft(), commandId: 'not-a-uuid' }),
     ).rejects.toThrow('INVALID_ARGUMENT');
     expect(native.saveAlarmConfiguration).not.toHaveBeenCalled();
-  });
-
-  it('launches QR registration without passing QR payload through the bridge', async () => {
-    native.launchQrRegistration.mockResolvedValue({
-      requestId: COMMAND_ID,
-      sessionId: ALARM_ID,
-      launched: true,
-      launchType: 'QR_REGISTRATION',
-    });
-
-    await launchQrRegistration({
-      requestId: COMMAND_ID,
-      aggregateId: ALARM_ID,
-      expectedRevision: 1,
-    });
-
-    expect(native.launchQrRegistration).toHaveBeenCalledWith({
-      contractVersion: MISSION_ALARM_CONTRACT_VERSION,
-      requestId: COMMAND_ID,
-      aggregateId: ALARM_ID,
-      expectedRevision: 1,
-    });
   });
 
   it('rejects inconsistent schedule and mission configurations before native', async () => {
@@ -128,8 +104,6 @@ describe('mission alarm native wrapper', () => {
           pushupProfileVersion: null,
           mathOperationsMask: 7,
           mathGeneratorVersion: 'math-v1',
-          qrRegistered: false,
-          qrDigestVersion: null,
         },
         nextOccurrenceAtUtcMs: null,
         scheduleHealth: 'DISABLED',

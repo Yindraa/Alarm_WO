@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
@@ -19,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     CommandReceiptEntity::class,
     DiagnosticEventEntity::class,
   ],
-  version = 1,
+  version = 2,
   exportSchema = true,
 )
 abstract class MissionAlarmDatabase : RoomDatabase() {
@@ -46,7 +47,37 @@ object MissionAlarmDatabaseFactory {
   private fun configure(
     builder: RoomDatabase.Builder<MissionAlarmDatabase>,
   ): RoomDatabase.Builder<MissionAlarmDatabase> = builder
+    .addMigrations(Migration1To2)
     .addCallback(SchemaInvariantCallback)
+
+  private object Migration1To2 : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      listOf(
+        "alarm_validate_insert",
+        "alarm_validate_update",
+        "mission_validate_insert",
+        "mission_validate_update",
+        "instance_mission_validate_insert",
+        "instance_mission_validate_update",
+      ).forEach { db.execSQL("DROP TRIGGER IF EXISTS $it") }
+      db.execSQL(
+        """UPDATE alarm_mission_config
+          SET qr_reference_digest = NULL, qr_digest_version = NULL, qr_key_alias = NULL
+          WHERE mission_type = 'QR'""",
+      )
+      db.execSQL(
+        """UPDATE instance_mission
+          SET qr_reference_digest = NULL, qr_digest_version = NULL, qr_key_alias = NULL
+          WHERE mission_type = 'QR'""",
+      )
+      db.execSQL(ALARM_INSERT_TRIGGER)
+      db.execSQL(ALARM_UPDATE_TRIGGER)
+      db.execSQL(MISSION_INSERT_TRIGGER)
+      db.execSQL(MISSION_UPDATE_TRIGGER)
+      db.execSQL(INSTANCE_MISSION_INSERT_TRIGGER)
+      db.execSQL(INSTANCE_MISSION_UPDATE_TRIGGER)
+    }
+  }
 
   private object SchemaInvariantCallback : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
@@ -74,6 +105,7 @@ object MissionAlarmDatabaseFactory {
       db.execSQL(DIAGNOSTIC_INSERT_TRIGGER)
       db.execSQL(DIAGNOSTIC_UPDATE_TRIGGER)
     }
+
   }
 
   private const val VALID_ALARM = """
@@ -85,15 +117,9 @@ object MissionAlarmDatabaseFactory {
       OR
       (NEW.schedule_kind = 'WEEKLY' AND NEW.one_time_at_utc_ms IS NULL AND NEW.repeat_days_mask BETWEEN 1 AND 127)
     )
-    AND (
-      NEW.enabled = 0 OR EXISTS (
-        SELECT 1 FROM alarm_mission_config
-        WHERE alarm_id = NEW.id
-          AND (mission_type <> 'QR' OR (
-            qr_reference_digest IS NOT NULL AND qr_digest_version IS NOT NULL AND qr_key_alias IS NOT NULL
-          ))
-      )
-    )
+    AND (NEW.enabled = 0 OR EXISTS (
+      SELECT 1 FROM alarm_mission_config WHERE alarm_id = NEW.id
+    ))
   """
 
   private const val VALID_MISSION = """
@@ -110,11 +136,8 @@ object MissionAlarmDatabaseFactory {
       OR (NEW.mission_type = 'QR' AND NEW.target = 1
         AND NEW.pushup_profile_version IS NULL
         AND NEW.math_operations_mask IS NULL AND NEW.math_generator_version IS NULL
-        AND (
-          (NEW.qr_reference_digest IS NOT NULL AND NEW.qr_digest_version IS NOT NULL AND NEW.qr_key_alias IS NOT NULL)
-          OR (NEW.qr_reference_digest IS NULL AND NEW.qr_digest_version IS NULL AND NEW.qr_key_alias IS NULL
-            AND EXISTS (SELECT 1 FROM alarm WHERE id = NEW.alarm_id AND enabled = 0))
-        ))
+        AND NEW.qr_reference_digest IS NULL AND NEW.qr_digest_version IS NULL
+        AND NEW.qr_key_alias IS NULL)
     )
   """
 
@@ -162,8 +185,8 @@ object MissionAlarmDatabaseFactory {
         AND NEW.math_generator_version IS NOT NULL AND NEW.qr_reference_digest IS NULL
         AND NEW.qr_digest_version IS NULL AND NEW.qr_key_alias IS NULL)
       OR (NEW.mission_type = 'QR' AND NEW.target = 1 AND NEW.pushup_profile_version IS NULL
-        AND NEW.math_generator_version IS NULL AND NEW.qr_reference_digest IS NOT NULL
-        AND NEW.qr_digest_version IS NOT NULL AND NEW.qr_key_alias IS NOT NULL)
+        AND NEW.math_generator_version IS NULL AND NEW.qr_reference_digest IS NULL
+        AND NEW.qr_digest_version IS NULL AND NEW.qr_key_alias IS NULL)
     )
   """
 

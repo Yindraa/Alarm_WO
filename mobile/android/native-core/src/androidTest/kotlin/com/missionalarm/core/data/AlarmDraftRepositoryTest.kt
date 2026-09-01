@@ -2,7 +2,6 @@ package com.missionalarm.core.data
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import android.database.sqlite.SQLiteConstraintException
 import com.missionalarm.core.domain.AlarmId
 import com.missionalarm.core.domain.CommandId
 import com.missionalarm.core.domain.MissionType
@@ -12,6 +11,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -90,7 +90,7 @@ class AlarmDraftRepositoryTest {
   }
 
   @Test
-  fun unregisteredQrConfigurationCanExistOnlyAsDisabledDraft() {
+  fun scanMissionConfigurationPersistsWithoutReferenceData() {
     val ack = repository.save(
       mathCommand(COMMAND_ID).copy(
         missionType = MissionType.QR,
@@ -102,12 +102,11 @@ class AlarmDraftRepositoryTest {
 
     assertEquals(1, ack.revision)
     assertEquals("QR", repository.find(AlarmId.parse(ALARM_ID))!!.mission.missionType)
-    assertThrows(SQLiteConstraintException::class.java) {
-      database.openHelper.writableDatabase.execSQL(
-        "UPDATE alarm SET enabled = 1, revision = 2 WHERE id = ?",
-        arrayOf(ALARM_ID),
-      )
-    }
+    database.openHelper.writableDatabase.execSQL(
+      "UPDATE alarm SET enabled = 1, revision = 2 WHERE id = ?",
+      arrayOf(ALARM_ID),
+    )
+    assertTrue(repository.find(AlarmId.parse(ALARM_ID))!!.alarm.enabled)
   }
 
   private fun mathCommand(commandId: String) = SaveAlarmDraftCommand(

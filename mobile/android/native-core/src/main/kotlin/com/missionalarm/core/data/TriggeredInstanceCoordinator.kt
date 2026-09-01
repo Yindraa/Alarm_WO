@@ -245,7 +245,7 @@ private fun AlarmMissionConfigEntity.toInstanceMission(instanceId: String, nowMs
     engineVersion = when (missionType) {
       "PUSH_UP" -> "pushup-engine-v1"
       "MATH" -> checkNotNull(mathGeneratorVersion)
-      "QR" -> "qr-engine-v1"
+      "QR" -> "scan-code-engine-v1"
       else -> error("unsupported mission type")
     },
     pushupProfileVersion = pushupProfileVersion,

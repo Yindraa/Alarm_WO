@@ -88,6 +88,24 @@ abstract class RuntimeDao {
 
   @Query(
     """
+    UPDATE instance_mission
+    SET runtime_status = 'IN_PROGRESS', updated_at_ms = :updatedAtMs
+    WHERE instance_id = :instanceId AND mission_type = 'QR' AND runtime_status = 'READY'
+    """,
+  )
+  abstract fun startScanMissionState(instanceId: String, updatedAtMs: Long): Int
+
+  @Query(
+    """
+    UPDATE instance_mission
+    SET runtime_status = 'IN_PROGRESS', updated_at_ms = :updatedAtMs
+    WHERE instance_id = :instanceId AND mission_type = 'PUSH_UP' AND runtime_status = 'READY'
+    """,
+  )
+  abstract fun startPushUpMissionState(instanceId: String, updatedAtMs: Long): Int
+
+  @Query(
+    """
     UPDATE alarm_instance
     SET revision = revision + 1, runtime_state = 'MISSION_IN_PROGRESS', updated_at_ms = :updatedAtMs
     WHERE id = :instanceId AND revision = :expectedRevision AND attention_slot = 1
@@ -129,6 +147,33 @@ abstract class RuntimeDao {
     runtimeStatus: String,
     updatedAtMs: Long,
   ): Int
+
+  @Query(
+    """
+    UPDATE instance_mission
+    SET committed_progress = :nextProgress, runtime_status = :runtimeStatus,
+      updated_at_ms = :updatedAtMs
+    WHERE instance_id = :instanceId AND mission_type = 'PUSH_UP'
+      AND committed_progress = :expectedProgress AND runtime_status = 'IN_PROGRESS'
+    """,
+  )
+  abstract fun advancePushUpProgress(
+    instanceId: String,
+    expectedProgress: Int,
+    nextProgress: Int,
+    runtimeStatus: String,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE instance_mission
+    SET committed_progress = target, runtime_status = 'COMPLETED', updated_at_ms = :updatedAtMs
+    WHERE instance_id = :instanceId AND mission_type = 'QR' AND target = 1
+      AND committed_progress = 0 AND runtime_status = 'IN_PROGRESS'
+    """,
+  )
+  abstract fun completeScanMissionState(instanceId: String, updatedAtMs: Long): Int
 
   @Query(
     """

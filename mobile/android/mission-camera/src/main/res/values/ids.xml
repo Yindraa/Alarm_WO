@@ -1,5 +1,9 @@
 <resources>
-  <item name="qr_registration_preview" type="id" />
-  <item name="qr_registration_status" type="id" />
-  <item name="qr_registration_permission_panel" type="id" />
+  <item name="code_scan_preview" type="id" />
+  <item name="code_scan_status" type="id" />
+  <item name="code_scan_permission_panel" type="id" />
+  <item name="pushup_preview" type="id" />
+  <item name="pushup_progress" type="id" />
+  <item name="pushup_status" type="id" />
+  <item name="pushup_recovery_panel" type="id" />
 </resources>

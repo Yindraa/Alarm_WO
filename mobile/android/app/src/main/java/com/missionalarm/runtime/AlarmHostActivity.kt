@@ -43,7 +43,11 @@ import com.missionalarm.core.data.MissionAlarmDatabaseFactory
 import com.missionalarm.core.data.PresentationEffectRunner
 import com.missionalarm.core.data.RuntimeEffectRunner
 import com.missionalarm.core.data.RuntimeStopEffectRunner
+import com.missionalarm.core.data.ScanMissionCoordinator
+import com.missionalarm.core.data.ScanMissionException
 import com.missionalarm.core.domain.WallClock
+import com.missionalarm.mission.camera.CodeScanActivity
+import com.missionalarm.mission.camera.PushUpMissionActivity
 import java.util.Date
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -59,6 +63,10 @@ class AlarmHostActivity : Activity() {
   private val mainHandler = Handler(Looper.getMainLooper())
   private var activeSnapshot: ActiveRuntimeSnapshot? = null
   private var emergencyDialog: AlertDialog? = null
+  private var pendingScan: PendingScan? = null
+  private var pendingPushUpInstanceId: String? = null
+  private var completingScan = false
+  private var completingPushUp = false
 
   private lateinit var loading: ProgressBar
   private lateinit var time: TextView
@@ -88,13 +96,37 @@ class AlarmHostActivity : Activity() {
 
   override fun onResume() {
     super.onResume()
-    if (::loading.isInitialized) refreshFromCanonicalState()
+    if (::loading.isInitialized && pendingScan == null && pendingPushUpInstanceId == null &&
+      !completingScan && !completingPushUp
+    ) {
+      refreshFromCanonicalState()
+    }
   }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
     refreshFromCanonicalState()
+  }
+
+  @Deprecated("Legacy result API is intentionally scoped to this internal native Activity pair")
+  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    super.onActivityResult(requestCode, resultCode, data)
+    when (requestCode) {
+      REQUEST_SCAN_CODE -> {
+        val pending = pendingScan
+        pendingScan = null
+        if (resultCode != RESULT_OK || pending == null ||
+          CodeScanActivity.sessionToken(data) != pending.sessionToken ||
+          CodeScanActivity.codeFormat(data) == null
+        ) {
+          refreshFromCanonicalState()
+          return
+        }
+        completeScanMission(pending)
+      }
+      REQUEST_PUSH_UP -> handlePushUpResult(resultCode, data)
+    }
   }
 
   override fun onPause() {
@@ -238,20 +270,119 @@ class AlarmHostActivity : Activity() {
     snapshot: ActiveRuntimeSnapshot,
     destination: MissionDestination,
   ) {
-    if (destination == MissionDestination.EMBEDDED_MATH) {
-      startMathMission(snapshot)
+    when (destination) {
+      MissionDestination.EMBEDDED_MATH -> startMathMission(snapshot)
+      MissionDestination.NATIVE_PUSH_UP -> startPushUpMission(snapshot)
+      MissionDestination.NATIVE_QR -> startScanMission(snapshot)
+    }
+  }
+
+  private fun startScanMission(snapshot: ActiveRuntimeSnapshot) {
+    primaryAction.isEnabled = false
+    loading.visibility = View.VISIBLE
+    executor.execute {
+      val result = runCatching { scanCoordinator().start(snapshot.instanceId) }
+      runOnUiThread {
+        if (isFinishing || isDestroyed) return@runOnUiThread
+        loading.visibility = View.GONE
+        result.fold(
+          onSuccess = { started ->
+            val token = UUID.randomUUID().toString()
+            pendingScan = PendingScan(token, started.instanceId, started.revision)
+            startActivityForResult(CodeScanActivity.intent(this, token), REQUEST_SCAN_CODE)
+          },
+          onFailure = { renderMissionRouteRecovery(snapshot) },
+        )
+      }
+    }
+  }
+
+  private fun completeScanMission(pending: PendingScan) {
+    completingScan = true
+    loading.visibility = View.VISIBLE
+    executor.execute {
+      val result = runCatching {
+        scanCoordinator().complete(pending.instanceId, pending.expectedRevision)
+      }
+      val outcome = result.getOrNull()
+      if (outcome?.completed == true) drainTerminalRuntimeEffects()
+      runOnUiThread {
+        if (isFinishing || isDestroyed) return@runOnUiThread
+        completingScan = false
+        loading.visibility = View.GONE
+        when {
+          result.exceptionOrNull() is ScanMissionException -> refreshFromCanonicalState()
+          result.isFailure || outcome == null -> renderRecoveryFailure()
+          outcome.promotedInstanceId != null -> refreshFromCanonicalState()
+          else -> renderScanSuccess()
+        }
+      }
+    }
+  }
+
+  private fun renderScanSuccess() {
+    activeSnapshot = null
+    mathWorkspace.visibility = View.GONE
+    title.setText(R.string.alarm_host_scan_success_title)
+    detail.setText(R.string.alarm_host_scan_success_detail)
+    progress.text = getString(R.string.alarm_host_progress, 1, 1)
+    queue.text = ""
+    primaryAction.setText(R.string.alarm_host_close)
+    primaryAction.isEnabled = true
+    primaryAction.setOnClickListener { finish() }
+    emergencyStatus.text = ""
+    emergencyAction.visibility = View.GONE
+  }
+
+  private fun startPushUpMission(snapshot: ActiveRuntimeSnapshot) {
+    pendingPushUpInstanceId = snapshot.instanceId
+    startActivityForResult(
+      PushUpMissionActivity.intent(this, snapshot.instanceId),
+      REQUEST_PUSH_UP,
+    )
+  }
+
+  private fun handlePushUpResult(resultCode: Int, data: Intent?) {
+    val pendingInstanceId = pendingPushUpInstanceId
+    pendingPushUpInstanceId = null
+    val completedId = PushUpMissionActivity.completedInstanceId(data)
+    val finalProgress = PushUpMissionActivity.finalProgress(data)
+    if (resultCode != RESULT_OK || completedId == null || finalProgress == null ||
+      (pendingInstanceId != null && completedId != pendingInstanceId)
+    ) {
+      refreshFromCanonicalState()
       return
     }
-    activeSnapshot = snapshot
-    detail.text = when (destination) {
-      MissionDestination.EMBEDDED_MATH -> error("Math route is handled before placeholder routing")
-      MissionDestination.NATIVE_PUSH_UP -> getString(R.string.alarm_host_pushup_route_ready)
-      MissionDestination.NATIVE_QR -> getString(R.string.alarm_host_qr_route_ready)
+    completingPushUp = true
+    loading.visibility = View.VISIBLE
+    val promotedId = PushUpMissionActivity.promotedInstanceId(data)
+    executor.execute {
+      val drained = runCatching { drainTerminalRuntimeEffects() }
+      runOnUiThread {
+        if (isFinishing || isDestroyed) return@runOnUiThread
+        completingPushUp = false
+        loading.visibility = View.GONE
+        when {
+          drained.isFailure -> renderRecoveryFailure()
+          promotedId != null -> refreshFromCanonicalState()
+          else -> renderPushUpSuccess(finalProgress)
+        }
+      }
     }
-    primaryAction.setText(R.string.alarm_host_route_reserved)
-    primaryAction.isEnabled = false
-    primaryAction.setOnClickListener(null)
-    emergencyStatus.setText(R.string.alarm_host_route_safety_notice)
+  }
+
+  private fun renderPushUpSuccess(progressValue: Int) {
+    activeSnapshot = null
+    mathWorkspace.visibility = View.GONE
+    title.setText(R.string.alarm_host_pushup_success_title)
+    detail.setText(R.string.alarm_host_pushup_success_detail)
+    progress.text = getString(R.string.alarm_host_progress, progressValue, progressValue)
+    queue.text = ""
+    primaryAction.setText(R.string.alarm_host_close)
+    primaryAction.isEnabled = true
+    primaryAction.setOnClickListener { finish() }
+    emergencyStatus.text = ""
+    emergencyAction.visibility = View.GONE
   }
 
   private fun startMathMission(snapshot: ActiveRuntimeSnapshot) {
@@ -380,6 +511,12 @@ class AlarmHostActivity : Activity() {
   }
 
   private fun mathCoordinator() = MathMissionCoordinator(
+    database,
+    WallClock { System.currentTimeMillis() },
+    EffectIdGenerator { UUID.randomUUID().toString() },
+  )
+
+  private fun scanCoordinator() = ScanMissionCoordinator(
     database,
     WallClock { System.currentTimeMillis() },
     EffectIdGenerator { UUID.randomUUID().toString() },
@@ -974,6 +1111,8 @@ class AlarmHostActivity : Activity() {
 
   companion object {
     private const val HOLD_TICK_MS = 50L
+    private const val REQUEST_SCAN_CODE = 4102
+    private const val REQUEST_PUSH_UP = 4103
     const val ACTION_PRESENT_INSTANCE = "com.missionalarm.action.PRESENT_ACTIVE_INSTANCE"
     const val EXTRA_INSTANCE_ID = "instanceId"
     private val UUID_V4 = Regex(
@@ -991,4 +1130,10 @@ class AlarmHostActivity : Activity() {
         putExtra(EXTRA_INSTANCE_ID, instanceId)
       }
   }
+
+  private data class PendingScan(
+    val sessionToken: String,
+    val instanceId: String,
+    val expectedRevision: Int,
+  )
 }

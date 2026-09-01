@@ -36,14 +36,12 @@ class MissionAlarmModuleTest {
   private lateinit var context: ReactApplicationContext
   private lateinit var module: MissionAlarmModule
   private val presentedInstances = mutableListOf<String>()
-  private val launchedQrRequests = mutableListOf<Triple<String, String, Int>>()
 
   @Before
   fun setUp() {
     val application = ApplicationProvider.getApplicationContext<android.content.Context>()
     application.deleteDatabase(DATABASE_NAME)
     presentedInstances.clear()
-    launchedQrRequests.clear()
     context = BridgeReactContext(application)
     module = testModule(capability = true)
   }
@@ -63,7 +61,7 @@ class MissionAlarmModuleTest {
     assertEquals(1, ack.getInt("revision"))
     assertFalse(ack.getBoolean("replayed"))
 
-    val queried = invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }
+    val queried = invoke { promise -> module.getAlarmEditorSnapshot(2.0, alarmId, promise) }
     assertNull(queried.error)
     val snapshot = queried.value as ReadableMap
     val alarm = checkNotNull(snapshot.getMap("alarm"))
@@ -78,7 +76,7 @@ class MissionAlarmModuleTest {
     val saved = invoke { promise -> module.saveAlarmConfiguration(draft(), promise) }
     val alarmId = (saved.value as ReadableMap).getString("aggregateId")!!
 
-    val queried = invoke { promise -> module.getHomeSnapshot(1.0, promise) }
+    val queried = invoke { promise -> module.getHomeSnapshot(2.0, promise) }
 
     assertNull(queried.error)
     val snapshot = queried.value as ReadableMap
@@ -105,34 +103,14 @@ class MissionAlarmModuleTest {
   }
 
   @Test
-  fun qrRegistrationLaunchRequiresPersistedQrDraftAndDebouncesRequest() {
+  fun scanMissionCanBeEnabledWithoutRegistration() {
     val saved = invoke { promise -> module.saveAlarmConfiguration(qrDraft(), promise) }
     val alarmId = (saved.value as ReadableMap).getString("aggregateId")!!
 
-    val stale = invoke { promise ->
-      module.launchQrRegistration(qrLaunch(QR_STALE_REQUEST_ID, alarmId, 2), promise)
-    }
-    assertEquals("CONFLICT_REVISION", stale.error?.getString("code"))
-    assertTrue(launchedQrRequests.isEmpty())
+    val enabled = invoke { promise -> module.enableAlarm(enable(alarmId), promise) }
 
-    val first = invoke { promise ->
-      module.launchQrRegistration(qrLaunch(QR_LAUNCH_REQUEST_ID, alarmId, 1), promise)
-    }
-    val replay = invoke { promise ->
-      module.launchQrRegistration(qrLaunch(QR_LAUNCH_REQUEST_ID, alarmId, 1), promise)
-    }
-
-    assertNull(first.error)
-    assertNull(replay.error)
-    assertEquals("QR_REGISTRATION", (first.value as ReadableMap).getString("launchType"))
-    assertEquals(
-      (first.value as ReadableMap).getString("sessionId"),
-      (replay.value as ReadableMap).getString("sessionId"),
-    )
-    assertEquals(
-      listOf(Triple(QR_LAUNCH_REQUEST_ID, alarmId, 1)),
-      launchedQrRequests,
-    )
+    assertNull(enabled.error)
+    assertEquals(2, (enabled.value as ReadableMap).getInt("revision"))
   }
 
   @Test
@@ -146,7 +124,7 @@ class MissionAlarmModuleTest {
     val ack = enabled.value as ReadableMap
     assertEquals(2, ack.getInt("revision"))
     assertEquals(alarmId, ack.getString("aggregateId"))
-    val queried = invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }
+    val queried = invoke { promise -> module.getAlarmEditorSnapshot(2.0, alarmId, promise) }
     val alarm = (queried.value as ReadableMap).getMap("alarm")!!
     assertTrue(alarm.getBoolean("enabled"))
     assertEquals("HEALTHY", alarm.getString("scheduleHealth"))
@@ -163,7 +141,7 @@ class MissionAlarmModuleTest {
     val rejected = invoke { promise -> module.enableAlarm(enable(alarmId), promise) }
 
     assertEquals("CAPABILITY_REQUIRED", rejected.error?.getString("code"))
-    val queried = invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }
+    val queried = invoke { promise -> module.getAlarmEditorSnapshot(2.0, alarmId, promise) }
     assertFalse((queried.value as ReadableMap).getMap("alarm")!!.getBoolean("enabled"))
   }
 
@@ -196,7 +174,7 @@ class MissionAlarmModuleTest {
     assertNull(edited.error)
     assertEquals(3, (edited.value as ReadableMap).getInt("revision"))
     val editedAlarm = (
-      invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }.value as ReadableMap
+      invoke { promise -> module.getAlarmEditorSnapshot(2.0, alarmId, promise) }.value as ReadableMap
       ).getMap("alarm")!!
     assertTrue(editedAlarm.getBoolean("enabled"))
     assertEquals("Updated", editedAlarm.getString("label"))
@@ -208,7 +186,7 @@ class MissionAlarmModuleTest {
     assertNull(disabled.error)
     assertEquals(4, (disabled.value as ReadableMap).getInt("revision"))
     val disabledAlarm = (
-      invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }.value as ReadableMap
+      invoke { promise -> module.getAlarmEditorSnapshot(2.0, alarmId, promise) }.value as ReadableMap
       ).getMap("alarm")!!
     assertFalse(disabledAlarm.getBoolean("enabled"))
     assertEquals("DISABLED", disabledAlarm.getString("scheduleHealth"))
@@ -218,13 +196,13 @@ class MissionAlarmModuleTest {
     }
     assertNull(deleted.error)
     assertEquals(5, (deleted.value as ReadableMap).getInt("revision"))
-    val missing = invoke { promise -> module.getAlarmEditorSnapshot(1.0, alarmId, promise) }
+    val missing = invoke { promise -> module.getAlarmEditorSnapshot(2.0, alarmId, promise) }
     assertEquals("NOT_FOUND", missing.error?.getString("code"))
   }
 
   @Test
   fun activeRuntimeQueryReturnsExplicitEmptySnapshot() {
-    val queried = invoke { promise -> module.getActiveRuntimeSnapshot(1.0, promise) }
+    val queried = invoke { promise -> module.getActiveRuntimeSnapshot(2.0, promise) }
 
     assertNull(queried.error)
     val snapshot = queried.value as ReadableMap
@@ -241,7 +219,7 @@ class MissionAlarmModuleTest {
     assertNull(invoke { promise -> module.enableAlarm(enable(alarmId), promise) }.error)
     seedTriggeredInstance(alarmId)
 
-    val queried = invoke { promise -> module.getActiveRuntimeSnapshot(1.0, promise) }
+    val queried = invoke { promise -> module.getActiveRuntimeSnapshot(2.0, promise) }
     assertNull(queried.error)
     val snapshot = queried.value as ReadableMap
     assertTrue(snapshot.getBoolean("found"))
@@ -249,7 +227,7 @@ class MissionAlarmModuleTest {
     assertEquals(1, snapshot.getInt("revision"))
     assertEquals("MATH", snapshot.getString("missionType"))
     assertEquals(3, snapshot.getMap("mathQuestion")!!.getInt("total"))
-    val home = invoke { promise -> module.getHomeSnapshot(1.0, promise) }
+    val home = invoke { promise -> module.getHomeSnapshot(2.0, promise) }
     assertNull(home.error)
     val activeSummary = (home.value as ReadableMap).getMap("active")!!
     assertEquals(INSTANCE_ID, activeSummary.getString("instanceId"))
@@ -333,7 +311,7 @@ class MissionAlarmModuleTest {
   }
 
   private fun draft() = Arguments.createMap().apply {
-    putInt("contractVersion", 1)
+    putInt("contractVersion", 2)
     putString("commandId", COMMAND_ID)
     putNull("alarmId")
     putNull("expectedRevision")
@@ -359,7 +337,7 @@ class MissionAlarmModuleTest {
   }
 
   private fun enable(alarmId: String) = Arguments.createMap().apply {
-    putInt("contractVersion", 1)
+    putInt("contractVersion", 2)
     putString("commandId", ENABLE_COMMAND_ID)
     putString("aggregateId", alarmId)
     putInt("expectedRevision", 1)
@@ -367,30 +345,22 @@ class MissionAlarmModuleTest {
 
   private fun aggregateCommand(commandId: String, alarmId: String, revision: Int) =
     Arguments.createMap().apply {
-      putInt("contractVersion", 1)
+      putInt("contractVersion", 2)
       putString("commandId", commandId)
       putString("aggregateId", alarmId)
       putInt("expectedRevision", revision)
     }
 
   private fun launch(instanceId: String, revision: Int) = Arguments.createMap().apply {
-    putInt("contractVersion", 1)
+    putInt("contractVersion", 2)
     putString("requestId", LAUNCH_REQUEST_ID)
     putString("aggregateId", instanceId)
     putInt("expectedRevision", revision)
   }
 
-  private fun qrLaunch(requestId: String, alarmId: String, revision: Int) =
-    Arguments.createMap().apply {
-      putInt("contractVersion", 1)
-      putString("requestId", requestId)
-      putString("aggregateId", alarmId)
-      putInt("expectedRevision", revision)
-    }
-
   private fun runtimeCommand(commandId: String, instanceId: String, revision: Int) =
     Arguments.createMap().apply {
-      putInt("contractVersion", 1)
+      putInt("contractVersion", 2)
       putString("commandId", commandId)
       putString("aggregateId", instanceId)
       putInt("expectedRevision", revision)
@@ -436,9 +406,6 @@ class MissionAlarmModuleTest {
     exactAlarmSchedulerOverride = ExactAlarmScheduler { _, _ -> },
     directBootMirrorStoreOverride = DirectBootMirrorStore { _, _ -> },
     alarmHostPresenterOverride = { instanceId -> presentedInstances += instanceId },
-    qrRegistrationLauncherOverride = { requestId, alarmId, revision ->
-      launchedQrRequests += Triple(requestId, alarmId, revision)
-    },
   )
 
   private data class PromiseResult(val value: Any?, val error: ReadableMap?)
@@ -451,8 +418,6 @@ class MissionAlarmModuleTest {
     const val DISABLE_COMMAND_ID = "89927654-58ae-47d4-aaf8-50122651f698"
     const val DELETE_COMMAND_ID = "957c85c3-1292-46ec-a714-35a7bded0781"
     const val LAUNCH_REQUEST_ID = "4a0977be-9c83-46d2-8b55-d605b389f0cb"
-    const val QR_LAUNCH_REQUEST_ID = "f263b9e0-c845-428b-9f03-3c7d4b8977ee"
-    const val QR_STALE_REQUEST_ID = "565179a7-4a79-4265-9f7d-4ca20875a9cc"
     const val START_MISSION_COMMAND_ID = "58573b64-5647-4189-bccc-ec14b6aa234e"
     const val ANSWER_COMMAND_ID = "4da9f09c-ddaf-44ef-b52f-933d5c59b060"
     const val INSTANCE_ID = "95bc545a-c392-4c47-b5b5-d69eb0bb037d"

@@ -14,36 +14,30 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class QrRegistrationActivityTest {
+class CodeScanActivityTest {
   @Test
-  fun validRequestOpensCameraSurfaceAndCanCloseCleanly() {
+  fun validSessionOpensCameraSurfaceAndCanCloseCleanly() {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     if (context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
       InstrumentationRegistry.getInstrumentation().uiAutomation
         .executeShellCommand("pm grant ${context.packageName} ${Manifest.permission.CAMERA}")
         .close()
     }
-    val scenario = ActivityScenario.launch<QrRegistrationActivity>(
-      QrRegistrationActivity.intent(
-        context,
-        REQUEST_ID,
-        ALARM_ID,
-        expectedRevision = 1,
-      ),
+    val scenario = ActivityScenario.launch<CodeScanActivity>(
+      CodeScanActivity.intent(context, SESSION_TOKEN),
     )
 
     scenario.onActivity { activity ->
-      assertNotNull(activity.findViewById<PreviewView>(R.id.qr_registration_preview))
+      assertNotNull(activity.findViewById<PreviewView>(R.id.code_scan_preview))
       assertEquals(
         View.GONE,
-        activity.findViewById<View>(R.id.qr_registration_permission_panel).visibility,
+        activity.findViewById<View>(R.id.code_scan_permission_panel).visibility,
       )
     }
     scenario.close()
   }
 
   private companion object {
-    const val REQUEST_ID = "d515097b-0211-4e5f-a890-a327eec31753"
-    const val ALARM_ID = "1da53135-64d8-4455-8539-e0a5172141ba"
+    const val SESSION_TOKEN = "d515097b-0211-4e5f-a890-a327eec31753"
   }
 }

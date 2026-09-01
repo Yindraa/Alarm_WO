@@ -12,7 +12,7 @@ import NativeMissionAlarm, {
   type SubmitMathAnswerInput,
 } from './specs/NativeMissionAlarm';
 
-export const MISSION_ALARM_CONTRACT_VERSION = 1;
+export const MISSION_ALARM_CONTRACT_VERSION = 2;
 
 export async function getContractInfo(): Promise<ContractInfo> {
   const info = await NativeMissionAlarm.getContractInfo();
@@ -201,23 +201,6 @@ export async function launchActiveInstance(
     throw new Error('INVALID_ARGUMENT');
   }
   return NativeMissionAlarm.launchActiveInstance({
-    ...request,
-    contractVersion: MISSION_ALARM_CONTRACT_VERSION,
-  });
-}
-
-export async function launchQrRegistration(
-  request: LaunchActiveInstance,
-): Promise<LaunchAck> {
-  requireUuid(request.requestId, 'requestId');
-  requireUuid(request.aggregateId, 'aggregateId');
-  if (
-    !Number.isInteger(request.expectedRevision) ||
-    request.expectedRevision < 1
-  ) {
-    throw new Error('INVALID_ARGUMENT');
-  }
-  return NativeMissionAlarm.launchQrRegistration({
     ...request,
     contractVersion: MISSION_ALARM_CONTRACT_VERSION,
   });
