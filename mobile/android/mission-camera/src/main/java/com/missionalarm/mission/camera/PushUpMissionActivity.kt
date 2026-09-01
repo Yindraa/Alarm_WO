@@ -59,6 +59,8 @@ class PushUpMissionActivity : ComponentActivity() {
   private lateinit var preview: PreviewView
   private lateinit var progressText: TextView
   private lateinit var statusText: TextView
+  private lateinit var phaseText: TextView
+  private lateinit var qualityText: TextView
   private lateinit var progressBar: ProgressBar
   private lateinit var permissionPanel: LinearLayout
   private lateinit var recoveryButton: Button
@@ -183,6 +185,8 @@ class PushUpMissionActivity : ComponentActivity() {
     runOnUiThread {
       if (terminal || isFinishing || isDestroyed) return@runOnUiThread
       statusText.setText(feedbackString(update.feedback))
+      phaseText.setText(phaseString(update.phase))
+      qualityText.text = qualityString(update.quality)
     }
   }
 
@@ -285,6 +289,31 @@ class PushUpMissionActivity : ComponentActivity() {
     PushUpFeedback.MISSION_COMPLETE -> R.string.pushup_complete
   }
 
+  private fun phaseString(phase: PushUpPhase): Int = when (phase) {
+    PushUpPhase.SEEKING_BODY -> R.string.pushup_phase_seeking_body
+    PushUpPhase.SEEKING_TOP -> R.string.pushup_phase_seeking_top
+    PushUpPhase.TOP_CONFIRMED -> R.string.pushup_phase_top_confirmed
+    PushUpPhase.DESCENDING -> R.string.pushup_phase_descending
+    PushUpPhase.BOTTOM_CONFIRMED -> R.string.pushup_phase_bottom_confirmed
+    PushUpPhase.ASCENDING -> R.string.pushup_phase_ascending
+    PushUpPhase.COOLDOWN -> R.string.pushup_phase_cooldown
+    PushUpPhase.COMPLETE -> R.string.pushup_phase_complete
+  }
+
+  private fun qualityString(quality: PushUpQualityStatus): String {
+    fun mark(passed: Boolean) = getString(
+      if (passed) R.string.pushup_gate_pass else R.string.pushup_gate_wait,
+    )
+    return getString(
+      R.string.pushup_quality_body,
+      mark(quality.poseDetected),
+      mark(quality.fullBodyVisible),
+      mark(quality.sideOn),
+      mark(quality.lightSufficient),
+      mark(quality.alignmentValid),
+    )
+  }
+
   private fun hasCameraPermission() = ContextCompat.checkSelfPermission(
     this,
     Manifest.permission.CAMERA,
@@ -304,6 +333,16 @@ class PushUpMissionActivity : ComponentActivity() {
       id = R.id.pushup_status
       gravity = Gravity.CENTER
       accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+    }
+    phaseText = textView(12, Color.rgb(255, 181, 71)).apply {
+      id = R.id.pushup_phase
+      setTypeface(typeface, Typeface.BOLD)
+      setText(R.string.pushup_phase_seeking_body)
+    }
+    qualityText = textView(14, Color.rgb(225, 232, 237)).apply {
+      id = R.id.pushup_quality
+      setLineSpacing(0f, 1.18f)
+      text = qualityString(PushUpQualityStatus())
     }
     progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
       progressTintList = ColorStateList.valueOf(Color.rgb(255, 181, 71))
@@ -350,6 +389,7 @@ class PushUpMissionActivity : ComponentActivity() {
       gravity = Gravity.CENTER
       setPadding(dp(24), dp(14), dp(24), dp(18))
       background = rounded(Color.argb(205, 16, 24, 32), 20)
+      addView(phaseText, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
       addView(statusText, LinearLayout.LayoutParams(-1, dp(50)))
       addView(Button(this@PushUpMissionActivity).apply {
         setText(R.string.pushup_back_to_alarm)
@@ -357,6 +397,17 @@ class PushUpMissionActivity : ComponentActivity() {
         background = rounded(Color.argb(170, 30, 43, 54), 16)
         setOnClickListener { finish() }
       }, LinearLayout.LayoutParams(-1, dp(48)))
+    }
+    val calibration = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL
+      setPadding(dp(20), dp(14), dp(20), dp(16))
+      background = rounded(Color.argb(205, 16, 24, 32), 20)
+      addView(textView(11, Color.rgb(255, 181, 71)).apply {
+        letterSpacing = 0.12f
+        setTypeface(typeface, Typeface.BOLD)
+        setText(R.string.pushup_calibration_eyebrow)
+      })
+      addView(qualityText, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
     }
     setContentView(FrameLayout(this).apply {
       setBackgroundColor(Color.rgb(16, 24, 32))
@@ -370,6 +421,10 @@ class PushUpMissionActivity : ComponentActivity() {
       })
       addView(footer, FrameLayout.LayoutParams(dp(360), -2, Gravity.BOTTOM or Gravity.END).apply {
         rightMargin = dp(20)
+        bottomMargin = dp(20)
+      })
+      addView(calibration, FrameLayout.LayoutParams(dp(300), -2, Gravity.BOTTOM or Gravity.START).apply {
+        leftMargin = dp(20)
         bottomMargin = dp(20)
       })
       addView(permissionPanel, FrameLayout.LayoutParams(dp(420), -2, Gravity.CENTER))

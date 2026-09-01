@@ -5,5 +5,7 @@
   <item name="pushup_preview" type="id" />
   <item name="pushup_progress" type="id" />
   <item name="pushup_status" type="id" />
+  <item name="pushup_phase" type="id" />
+  <item name="pushup_quality" type="id" />
   <item name="pushup_recovery_panel" type="id" />
 </resources>

@@ -110,7 +110,7 @@ describe('mission alarm native wrapper', () => {
         scheduleErrorCode: null,
       },
       capabilities: capabilitySnapshot(),
-      availablePushupProfileVersion: 'pushup-profile-v1',
+      availablePushupProfileVersion: 'pushup-profile-v0',
       availableMathGeneratorVersion: 'math-v1',
     });
 

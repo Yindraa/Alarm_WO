@@ -278,7 +278,7 @@ describe('application startup recovery gate', () => {
         repeatDaysMask: 0,
         missionType: 'PUSH_UP',
         target: 10,
-        pushupProfileVersion: 'pushup-profile-v1',
+        pushupProfileVersion: 'pushup-profile-v0',
         mathOperationsMask: null,
         mathGeneratorVersion: null,
       }),
@@ -585,7 +585,7 @@ function newEditorSnapshot() {
       fullScreenIntent: { ...capability, capability: 'FULL_SCREEN_INTENT' },
       camera: { ...capability, capability: 'CAMERA' },
     },
-    availablePushupProfileVersion: 'pushup-profile-v1',
+    availablePushupProfileVersion: 'pushup-profile-v0',
     availableMathGeneratorVersion: 'math-v1',
   } as const;
 }

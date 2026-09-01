@@ -122,8 +122,28 @@ class PushUpStateMachineTest {
     assertEquals(PushUpFeedback.FULL_BODY_REQUIRED, fixture.frame(fullBody = false).feedback)
     assertEquals(PushUpFeedback.TURN_SIDEWAYS, fixture.frame(sideOn = false).feedback)
     assertEquals(PushUpFeedback.LOW_LIGHT, fixture.frame(lowLight = true).feedback)
+    assertTrue(fixture.last.quality.poseDetected)
+    assertTrue(fixture.last.quality.fullBodyVisible)
+    assertTrue(fixture.last.quality.sideOn)
+    assertFalse(fixture.last.quality.lightSufficient)
+    assertTrue(fixture.last.quality.alignmentValid)
     assertTrue(fixture.last.accepted)
     assertEquals(0, fixture.last.committedReps)
+  }
+
+  @Test
+  fun staleFrameRetainsLastAcceptedCalibrationStatus() {
+    val machine = PushUpStateMachine(target = 1, profile = profile)
+    val fixture = Fixture(machine)
+    val accepted = fixture.frame(sideOn = false)
+
+    val stale = machine.process(
+      fixture.observation(angle = 170.0, sequence = fixture.sequence, sideOn = true),
+    )
+
+    assertFalse(stale.accepted)
+    assertEquals(accepted.quality, stale.quality)
+    assertFalse(stale.quality.sideOn)
   }
 
   private class Fixture(private val machine: PushUpStateMachine) {

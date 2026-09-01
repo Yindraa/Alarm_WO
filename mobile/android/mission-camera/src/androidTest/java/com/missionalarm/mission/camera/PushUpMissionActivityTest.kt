@@ -50,6 +50,8 @@ class PushUpMissionActivityTest {
     scenario.onActivity { activity ->
       assertNotNull(activity.findViewById<PreviewView>(R.id.pushup_preview))
       assertNotNull(activity.findViewById<android.view.View>(R.id.pushup_progress))
+      assertNotNull(activity.findViewById<android.view.View>(R.id.pushup_phase))
+      assertNotNull(activity.findViewById<android.view.View>(R.id.pushup_quality))
       assertEquals(INSTANCE_ID, PushUpMissionActivity.validatedInstanceId(activity.intent))
     }
     scenario.close()

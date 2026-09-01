@@ -701,7 +701,7 @@ class MissionAlarmModule(
     const val NAME = "NativeMissionAlarm"
     const val CONTRACT_VERSION = 2
     const val MINIMUM_CLIENT_CONTRACT_VERSION = 2
-    const val PUSHUP_PROFILE_VERSION = "pushup-profile-v1"
+    const val PUSHUP_PROFILE_VERSION = "pushup-profile-v0"
     const val MATH_GENERATOR_VERSION = "math-v1"
     const val HOME_HISTORY_LIMIT = 5
   }

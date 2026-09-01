@@ -1,0 +1,1118 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "1e616b2271dcdc6d243429dada4db522",
+    "entities": [
+      {
+        "tableName": "alarm",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `revision` INTEGER NOT NULL, `label` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `schedule_kind` TEXT NOT NULL, `local_time_minutes` INTEGER NOT NULL, `repeat_days_mask` INTEGER NOT NULL, `one_time_at_utc_ms` INTEGER, `configured_timezone_id` TEXT NOT NULL, `sound_id` TEXT NOT NULL, `created_at_ms` INTEGER NOT NULL, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enabled",
+            "columnName": "enabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduleKind",
+            "columnName": "schedule_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localTimeMinutes",
+            "columnName": "local_time_minutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "repeatDaysMask",
+            "columnName": "repeat_days_mask",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "oneTimeAtUtcMs",
+            "columnName": "one_time_at_utc_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "configuredTimezoneId",
+            "columnName": "configured_timezone_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "soundId",
+            "columnName": "sound_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "created_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_alarm_enabled",
+            "unique": false,
+            "columnNames": [
+              "enabled"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_alarm_enabled` ON `${TABLE_NAME}` (`enabled`)"
+          }
+        ]
+      },
+      {
+        "tableName": "alarm_mission_config",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`alarm_id` TEXT NOT NULL, `mission_type` TEXT NOT NULL, `config_version` INTEGER NOT NULL, `target` INTEGER NOT NULL, `pushup_profile_version` TEXT, `math_operations_mask` INTEGER, `math_generator_version` TEXT, `qr_reference_digest` BLOB, `qr_digest_version` TEXT, `qr_key_alias` TEXT, PRIMARY KEY(`alarm_id`), FOREIGN KEY(`alarm_id`) REFERENCES `alarm`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "alarmId",
+            "columnName": "alarm_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "missionType",
+            "columnName": "mission_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "configVersion",
+            "columnName": "config_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "target",
+            "columnName": "target",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pushupProfileVersion",
+            "columnName": "pushup_profile_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mathOperationsMask",
+            "columnName": "math_operations_mask",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "mathGeneratorVersion",
+            "columnName": "math_generator_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "qrReferenceDigest",
+            "columnName": "qr_reference_digest",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "qrDigestVersion",
+            "columnName": "qr_digest_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "qrKeyAlias",
+            "columnName": "qr_key_alias",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "alarm_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "alarm",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "alarm_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "alarm_occurrence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `dedupe_key` TEXT NOT NULL, `alarm_id` TEXT, `alarm_revision` INTEGER NOT NULL, `scheduled_at_utc_ms` INTEGER NOT NULL, `scheduled_local_date` TEXT NOT NULL, `scheduled_local_time_minutes` INTEGER NOT NULL, `timezone_id` TEXT NOT NULL, `utc_offset_seconds` INTEGER NOT NULL, `state` TEXT NOT NULL, `last_error_code` TEXT, `created_at_ms` INTEGER NOT NULL, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`alarm_id`) REFERENCES `alarm`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dedupeKey",
+            "columnName": "dedupe_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alarmId",
+            "columnName": "alarm_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "alarmRevision",
+            "columnName": "alarm_revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledAtUtcMs",
+            "columnName": "scheduled_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledLocalDate",
+            "columnName": "scheduled_local_date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledLocalTimeMinutes",
+            "columnName": "scheduled_local_time_minutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timezoneId",
+            "columnName": "timezone_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "utcOffsetSeconds",
+            "columnName": "utc_offset_seconds",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastErrorCode",
+            "columnName": "last_error_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "created_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_alarm_occurrence_dedupe_key",
+            "unique": true,
+            "columnNames": [
+              "dedupe_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_alarm_occurrence_dedupe_key` ON `${TABLE_NAME}` (`dedupe_key`)"
+          },
+          {
+            "name": "idx_occurrence_due",
+            "unique": false,
+            "columnNames": [
+              "state",
+              "scheduled_at_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_occurrence_due` ON `${TABLE_NAME}` (`state`, `scheduled_at_utc_ms`)"
+          },
+          {
+            "name": "idx_occurrence_alarm_time",
+            "unique": false,
+            "columnNames": [
+              "alarm_id",
+              "scheduled_at_utc_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_occurrence_alarm_time` ON `${TABLE_NAME}` (`alarm_id`, `scheduled_at_utc_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "alarm",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "alarm_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "alarm_instance",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `occurrence_id` TEXT NOT NULL, `alarm_id` TEXT, `revision` INTEGER NOT NULL, `runtime_state` TEXT NOT NULL, `queue_order` INTEGER NOT NULL, `attention_slot` INTEGER, `scheduled_at_utc_ms` INTEGER NOT NULL, `actual_trigger_at_ms` INTEGER, `trigger_elapsed_realtime_ms` INTEGER, `boot_session_token` TEXT, `terminal_at_ms` INTEGER, `terminal_result` TEXT, `dismiss_method` TEXT, `error_reason_code` TEXT, `label_snapshot` TEXT NOT NULL, `sound_id_snapshot` TEXT NOT NULL, `created_at_ms` INTEGER NOT NULL, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`occurrence_id`) REFERENCES `alarm_occurrence`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION , FOREIGN KEY(`alarm_id`) REFERENCES `alarm`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurrenceId",
+            "columnName": "occurrence_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alarmId",
+            "columnName": "alarm_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runtimeState",
+            "columnName": "runtime_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "queueOrder",
+            "columnName": "queue_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attentionSlot",
+            "columnName": "attention_slot",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "scheduledAtUtcMs",
+            "columnName": "scheduled_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualTriggerAtMs",
+            "columnName": "actual_trigger_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "triggerElapsedRealtimeMs",
+            "columnName": "trigger_elapsed_realtime_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "bootSessionToken",
+            "columnName": "boot_session_token",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "terminalAtMs",
+            "columnName": "terminal_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "terminalResult",
+            "columnName": "terminal_result",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dismissMethod",
+            "columnName": "dismiss_method",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "errorReasonCode",
+            "columnName": "error_reason_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "labelSnapshot",
+            "columnName": "label_snapshot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "soundIdSnapshot",
+            "columnName": "sound_id_snapshot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "created_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_alarm_instance_occurrence_id",
+            "unique": true,
+            "columnNames": [
+              "occurrence_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_alarm_instance_occurrence_id` ON `${TABLE_NAME}` (`occurrence_id`)"
+          },
+          {
+            "name": "index_alarm_instance_queue_order",
+            "unique": true,
+            "columnNames": [
+              "queue_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_alarm_instance_queue_order` ON `${TABLE_NAME}` (`queue_order`)"
+          },
+          {
+            "name": "index_alarm_instance_attention_slot",
+            "unique": true,
+            "columnNames": [
+              "attention_slot"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_alarm_instance_attention_slot` ON `${TABLE_NAME}` (`attention_slot`)"
+          },
+          {
+            "name": "idx_instance_active_fifo",
+            "unique": false,
+            "columnNames": [
+              "runtime_state",
+              "scheduled_at_utc_ms",
+              "queue_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_instance_active_fifo` ON `${TABLE_NAME}` (`runtime_state`, `scheduled_at_utc_ms`, `queue_order`)"
+          },
+          {
+            "name": "idx_instance_alarm",
+            "unique": false,
+            "columnNames": [
+              "alarm_id",
+              "created_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_instance_alarm` ON `${TABLE_NAME}` (`alarm_id`, `created_at_ms`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "alarm_occurrence",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "occurrence_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "alarm",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "alarm_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "instance_mission",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`instance_id` TEXT NOT NULL, `mission_type` TEXT NOT NULL, `snapshot_version` INTEGER NOT NULL, `target` INTEGER NOT NULL, `committed_progress` INTEGER NOT NULL, `runtime_status` TEXT NOT NULL, `engine_version` TEXT NOT NULL, `pushup_profile_version` TEXT, `math_generator_version` TEXT, `qr_reference_digest` BLOB, `qr_digest_version` TEXT, `qr_key_alias` TEXT, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`instance_id`), FOREIGN KEY(`instance_id`) REFERENCES `alarm_instance`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "instanceId",
+            "columnName": "instance_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "missionType",
+            "columnName": "mission_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "snapshotVersion",
+            "columnName": "snapshot_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "target",
+            "columnName": "target",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "committedProgress",
+            "columnName": "committed_progress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runtimeStatus",
+            "columnName": "runtime_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "engineVersion",
+            "columnName": "engine_version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pushupProfileVersion",
+            "columnName": "pushup_profile_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mathGeneratorVersion",
+            "columnName": "math_generator_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "qrReferenceDigest",
+            "columnName": "qr_reference_digest",
+            "affinity": "BLOB"
+          },
+          {
+            "fieldPath": "qrDigestVersion",
+            "columnName": "qr_digest_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "qrKeyAlias",
+            "columnName": "qr_key_alias",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "instance_id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "alarm_instance",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "instance_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "math_question",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`instance_id` TEXT NOT NULL, `ordinal` INTEGER NOT NULL, `operation` TEXT NOT NULL, `operand_a` INTEGER NOT NULL, `operand_b` INTEGER NOT NULL, `correct_answer` INTEGER NOT NULL, `answered` INTEGER NOT NULL, `answered_at_ms` INTEGER, PRIMARY KEY(`instance_id`, `ordinal`), FOREIGN KEY(`instance_id`) REFERENCES `alarm_instance`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "instanceId",
+            "columnName": "instance_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ordinal",
+            "columnName": "ordinal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operation",
+            "columnName": "operation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operandA",
+            "columnName": "operand_a",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operandB",
+            "columnName": "operand_b",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correctAnswer",
+            "columnName": "correct_answer",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "answered",
+            "columnName": "answered",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "answeredAtMs",
+            "columnName": "answered_at_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "instance_id",
+            "ordinal"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "alarm_instance",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "instance_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "alarm_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`instance_id` TEXT NOT NULL, `scheduled_at_utc_ms` INTEGER NOT NULL, `actual_trigger_at_ms` INTEGER, `ended_at_ms` INTEGER NOT NULL, `completion_duration_ms` INTEGER, `mission_type` TEXT NOT NULL, `target` INTEGER NOT NULL, `final_progress` INTEGER NOT NULL, `result` TEXT NOT NULL, `dismiss_method` TEXT NOT NULL, `error_reason_code` TEXT, `engine_version` TEXT NOT NULL, `profile_version` TEXT, `created_at_ms` INTEGER NOT NULL, PRIMARY KEY(`instance_id`), FOREIGN KEY(`instance_id`) REFERENCES `alarm_instance`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "instanceId",
+            "columnName": "instance_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledAtUtcMs",
+            "columnName": "scheduled_at_utc_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualTriggerAtMs",
+            "columnName": "actual_trigger_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "endedAtMs",
+            "columnName": "ended_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completionDurationMs",
+            "columnName": "completion_duration_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "missionType",
+            "columnName": "mission_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "target",
+            "columnName": "target",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finalProgress",
+            "columnName": "final_progress",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "result",
+            "columnName": "result",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dismissMethod",
+            "columnName": "dismiss_method",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "errorReasonCode",
+            "columnName": "error_reason_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "engineVersion",
+            "columnName": "engine_version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileVersion",
+            "columnName": "profile_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "created_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "instance_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_history_recent",
+            "unique": false,
+            "columnNames": [
+              "ended_at_ms",
+              "instance_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_history_recent` ON `${TABLE_NAME}` (`ended_at_ms`, `instance_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "alarm_instance",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "instance_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "runtime_effect",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `effect_key` TEXT NOT NULL, `aggregate_type` TEXT NOT NULL, `aggregate_id` TEXT NOT NULL, `effect_type` TEXT NOT NULL, `payload_version` INTEGER NOT NULL, `payload_json` TEXT NOT NULL, `status` TEXT NOT NULL, `attempt_count` INTEGER NOT NULL, `next_attempt_at_ms` INTEGER, `lease_owner` TEXT, `lease_until_ms` INTEGER, `last_error_code` TEXT, `created_at_ms` INTEGER NOT NULL, `updated_at_ms` INTEGER NOT NULL, `acknowledged_at_ms` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effectKey",
+            "columnName": "effect_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aggregateType",
+            "columnName": "aggregate_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aggregateId",
+            "columnName": "aggregate_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effectType",
+            "columnName": "effect_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadVersion",
+            "columnName": "payload_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payload_json",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptCount",
+            "columnName": "attempt_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextAttemptAtMs",
+            "columnName": "next_attempt_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "leaseOwner",
+            "columnName": "lease_owner",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "leaseUntilMs",
+            "columnName": "lease_until_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastErrorCode",
+            "columnName": "last_error_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "created_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "acknowledgedAtMs",
+            "columnName": "acknowledged_at_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_runtime_effect_effect_key",
+            "unique": true,
+            "columnNames": [
+              "effect_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_runtime_effect_effect_key` ON `${TABLE_NAME}` (`effect_key`)"
+          },
+          {
+            "name": "idx_effect_claim",
+            "unique": false,
+            "columnNames": [
+              "status",
+              "next_attempt_at_ms",
+              "lease_until_ms",
+              "created_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_effect_claim` ON `${TABLE_NAME}` (`status`, `next_attempt_at_ms`, `lease_until_ms`, `created_at_ms`)"
+          },
+          {
+            "name": "idx_effect_aggregate",
+            "unique": false,
+            "columnNames": [
+              "aggregate_type",
+              "aggregate_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_effect_aggregate` ON `${TABLE_NAME}` (`aggregate_type`, `aggregate_id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "command_receipt",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`command_id` TEXT NOT NULL, `command_type` TEXT NOT NULL, `request_hash` TEXT NOT NULL, `aggregate_type` TEXT NOT NULL, `aggregate_id` TEXT NOT NULL, `result_revision` INTEGER NOT NULL, `status` TEXT NOT NULL, `outcome_code` TEXT, `created_at_ms` INTEGER NOT NULL, `expires_at_ms` INTEGER NOT NULL, PRIMARY KEY(`command_id`))",
+        "fields": [
+          {
+            "fieldPath": "commandId",
+            "columnName": "command_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "commandType",
+            "columnName": "command_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestHash",
+            "columnName": "request_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aggregateType",
+            "columnName": "aggregate_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aggregateId",
+            "columnName": "aggregate_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resultRevision",
+            "columnName": "result_revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outcomeCode",
+            "columnName": "outcome_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtMs",
+            "columnName": "created_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAtMs",
+            "columnName": "expires_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "command_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_command_expiry",
+            "unique": false,
+            "columnNames": [
+              "expires_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_command_expiry` ON `${TABLE_NAME}` (`expires_at_ms`)"
+          },
+          {
+            "name": "idx_command_aggregate",
+            "unique": false,
+            "columnNames": [
+              "aggregate_type",
+              "aggregate_id",
+              "created_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_command_aggregate` ON `${TABLE_NAME}` (`aggregate_type`, `aggregate_id`, `created_at_ms`)"
+          }
+        ]
+      },
+      {
+        "tableName": "diagnostic_event",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `occurred_at_ms` INTEGER NOT NULL, `elapsed_realtime_ms` INTEGER, `event_code` TEXT NOT NULL, `reason_code` TEXT, `alarm_id` TEXT, `occurrence_id` TEXT, `instance_id` TEXT, `mission_session_id` TEXT, `metadata_json` TEXT, `expires_at_ms` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAtMs",
+            "columnName": "occurred_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elapsedRealtimeMs",
+            "columnName": "elapsed_realtime_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "eventCode",
+            "columnName": "event_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reasonCode",
+            "columnName": "reason_code",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "alarmId",
+            "columnName": "alarm_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "occurrenceId",
+            "columnName": "occurrence_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "instanceId",
+            "columnName": "instance_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "missionSessionId",
+            "columnName": "mission_session_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "metadataJson",
+            "columnName": "metadata_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "expiresAtMs",
+            "columnName": "expires_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_diag_expiry",
+            "unique": false,
+            "columnNames": [
+              "expires_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_diag_expiry` ON `${TABLE_NAME}` (`expires_at_ms`)"
+          },
+          {
+            "name": "idx_diag_instance",
+            "unique": false,
+            "columnNames": [
+              "instance_id",
+              "occurred_at_ms"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_diag_instance` ON `${TABLE_NAME}` (`instance_id`, `occurred_at_ms`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1e616b2271dcdc6d243429dada4db522')"
+    ]
+  }
+}

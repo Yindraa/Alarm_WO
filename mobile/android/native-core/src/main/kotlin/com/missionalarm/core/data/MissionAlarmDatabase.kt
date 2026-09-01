@@ -20,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
     CommandReceiptEntity::class,
     DiagnosticEventEntity::class,
   ],
-  version = 2,
+  version = 3,
   exportSchema = true,
 )
 abstract class MissionAlarmDatabase : RoomDatabase() {
@@ -47,7 +47,7 @@ object MissionAlarmDatabaseFactory {
   private fun configure(
     builder: RoomDatabase.Builder<MissionAlarmDatabase>,
   ): RoomDatabase.Builder<MissionAlarmDatabase> = builder
-    .addMigrations(Migration1To2)
+    .addMigrations(Migration1To2, Migration2To3)
     .addCallback(SchemaInvariantCallback)
 
   private object Migration1To2 : Migration(1, 2) {
@@ -76,6 +76,21 @@ object MissionAlarmDatabaseFactory {
       db.execSQL(MISSION_UPDATE_TRIGGER)
       db.execSQL(INSTANCE_MISSION_INSERT_TRIGGER)
       db.execSQL(INSTANCE_MISSION_UPDATE_TRIGGER)
+    }
+  }
+
+  private object Migration2To3 : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+      db.execSQL(
+        """UPDATE alarm_mission_config
+          SET pushup_profile_version = 'pushup-profile-v0'
+          WHERE mission_type = 'PUSH_UP' AND pushup_profile_version = 'pushup-profile-v1'""",
+      )
+      db.execSQL(
+        """UPDATE instance_mission
+          SET pushup_profile_version = 'pushup-profile-v0'
+          WHERE mission_type = 'PUSH_UP' AND pushup_profile_version = 'pushup-profile-v1'""",
+      )
     }
   }
 

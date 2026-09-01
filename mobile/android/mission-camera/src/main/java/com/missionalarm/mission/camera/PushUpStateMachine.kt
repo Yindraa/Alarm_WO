@@ -76,12 +76,22 @@ enum class PushUpFeedback {
   MISSION_COMPLETE,
 }
 
+/** Privacy-safe live calibration state. No angles, landmarks, or frame data are exposed. */
+data class PushUpQualityStatus(
+  val poseDetected: Boolean = false,
+  val fullBodyVisible: Boolean = false,
+  val sideOn: Boolean = false,
+  val lightSufficient: Boolean = false,
+  val alignmentValid: Boolean = false,
+)
+
 data class PushUpUpdate(
   val phase: PushUpPhase,
   val committedReps: Int,
   val target: Int,
   val feedback: PushUpFeedback,
   val accepted: Boolean,
+  val quality: PushUpQualityStatus,
 ) {
   val completed: Boolean get() = phase == PushUpPhase.COMPLETE
 }
@@ -107,6 +117,7 @@ class PushUpStateMachine(
   private var firstTopAtMs: Long? = null
   private var cooldownStartedAtMs: Long? = null
   private var stableCandidate: StableCandidate? = null
+  private var quality = PushUpQualityStatus()
   private var feedback = if (phase == PushUpPhase.COMPLETE) {
     PushUpFeedback.MISSION_COMPLETE
   } else {
@@ -126,6 +137,13 @@ class PushUpStateMachine(
     }
     lastFrameSequence = observation.frameSequence
     lastTimestampMs = observation.timestampMs
+    quality = PushUpQualityStatus(
+      poseDetected = observation.poseDetected,
+      fullBodyVisible = observation.fullBodyVisible,
+      sideOn = observation.sideOn,
+      lightSufficient = !observation.lowLight,
+      alignmentValid = observation.alignmentValid,
+    )
 
     val qualityFeedback = qualityFeedback(observation)
     if (qualityFeedback != null) {
@@ -298,6 +316,7 @@ class PushUpStateMachine(
     target = target,
     feedback = feedback,
     accepted = accepted,
+    quality = quality,
   )
 
   private data class StableCandidate(
