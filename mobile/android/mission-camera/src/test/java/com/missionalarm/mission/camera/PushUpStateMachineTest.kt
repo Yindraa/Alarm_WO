@@ -146,6 +146,48 @@ class PushUpStateMachineTest {
     assertFalse(stale.quality.sideOn)
   }
 
+  @Test
+  fun calibratedBottomBoundaryCanCompleteAValidRep() {
+    val machine = PushUpStateMachine(target = 1, profile = profile)
+    val fixture = Fixture(machine)
+
+    fixture.establishTop()
+    fixture.frame(angle = 135.0)
+    fixture.frame(angle = 104.0, advanceMs = 1)
+    fixture.frame(angle = 104.0, advanceMs = profile.stableBottomMs)
+    fixture.frame(angle = 121.0)
+    val result = fixture.stableReturnTop()
+
+    assertEquals(PushUpPhase.COMPLETE, result.phase)
+    assertEquals(1, result.committedReps)
+  }
+
+  @Test
+  fun oneTransientQualityFailureDoesNotDiscardStableTopCandidate() {
+    val machine = PushUpStateMachine(target = 1, profile = profile)
+    val fixture = Fixture(machine)
+    fixture.setup()
+
+    fixture.frame(angle = 160.0, advanceMs = 1)
+    fixture.frame(angle = 160.0, advanceMs = 100, poseDetected = false)
+    val result = fixture.frame(angle = 160.0, advanceMs = 100)
+
+    assertEquals(PushUpPhase.TOP_CONFIRMED, result.phase)
+    assertEquals(PushUpFeedback.LOWER_BODY, result.feedback)
+  }
+
+  @Test
+  fun preferredBodySideRemainsStickyDuringRep() {
+    assertEquals(
+      PushUpSide.RIGHT,
+      PushUpFeatureExtractor.selectSide(null, leftQuality = 0.70, rightQuality = 0.90),
+    )
+    assertEquals(
+      PushUpSide.RIGHT,
+      PushUpFeatureExtractor.selectSide(PushUpSide.RIGHT, leftQuality = 0.95, rightQuality = 0.65),
+    )
+  }
+
   private class Fixture(private val machine: PushUpStateMachine) {
     var sessionId = "session-a"
     var sequence = 0L

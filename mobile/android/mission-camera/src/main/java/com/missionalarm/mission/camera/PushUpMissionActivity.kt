@@ -301,6 +301,9 @@ class PushUpMissionActivity : ComponentActivity() {
   }
 
   private fun qualityString(quality: PushUpQualityStatus): String {
+    val ready = quality.poseDetected && quality.fullBodyVisible && quality.sideOn &&
+      quality.lightSufficient && quality.alignmentValid
+    if (ready) return getString(R.string.pushup_quality_ready)
     fun mark(passed: Boolean) = getString(
       if (passed) R.string.pushup_gate_pass else R.string.pushup_gate_wait,
     )
@@ -325,11 +328,11 @@ class PushUpMissionActivity : ComponentActivity() {
       implementationMode = PreviewView.ImplementationMode.COMPATIBLE
       scaleType = PreviewView.ScaleType.FILL_CENTER
     }
-    progressText = textView(30, Color.WHITE).apply {
+    progressText = textView(24, Color.WHITE).apply {
       id = R.id.pushup_progress
       setTypeface(typeface, Typeface.BOLD)
     }
-    statusText = textView(18, Color.WHITE).apply {
+    statusText = textView(16, Color.WHITE).apply {
       id = R.id.pushup_status
       gravity = Gravity.CENTER
       accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -339,9 +342,9 @@ class PushUpMissionActivity : ComponentActivity() {
       setTypeface(typeface, Typeface.BOLD)
       setText(R.string.pushup_phase_seeking_body)
     }
-    qualityText = textView(14, Color.rgb(225, 232, 237)).apply {
+    qualityText = textView(12, Color.rgb(225, 232, 237)).apply {
       id = R.id.pushup_quality
-      setLineSpacing(0f, 1.18f)
+      gravity = Gravity.CENTER
       text = qualityString(PushUpQualityStatus())
     }
     progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -374,40 +377,47 @@ class PushUpMissionActivity : ComponentActivity() {
     }
     val header = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
-      setPadding(dp(24), dp(18), dp(24), dp(16))
-      background = rounded(Color.argb(205, 16, 24, 32), 20)
-      addView(textView(11, Color.rgb(255, 181, 71)).apply {
+      setPadding(dp(16), dp(10), dp(16), dp(12))
+      background = rounded(Color.argb(190, 16, 24, 32), 16)
+      addView(textView(9, Color.rgb(255, 181, 71)).apply {
         letterSpacing = 0.14f
         setTypeface(typeface, Typeface.BOLD)
         setText(R.string.pushup_eyebrow)
       })
       addView(progressText)
-      addView(progressBar, LinearLayout.LayoutParams(-1, dp(8)).apply { topMargin = dp(8) })
+      addView(progressBar, LinearLayout.LayoutParams(-1, dp(5)).apply { topMargin = dp(4) })
     }
     val footer = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       gravity = Gravity.CENTER
-      setPadding(dp(24), dp(14), dp(24), dp(18))
-      background = rounded(Color.argb(205, 16, 24, 32), 20)
-      addView(phaseText, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
-      addView(statusText, LinearLayout.LayoutParams(-1, dp(50)))
-      addView(Button(this@PushUpMissionActivity).apply {
-        setText(R.string.pushup_back_to_alarm)
-        setTextColor(Color.WHITE)
-        background = rounded(Color.argb(170, 30, 43, 54), 16)
-        setOnClickListener { finish() }
-      }, LinearLayout.LayoutParams(-1, dp(48)))
+      setPadding(dp(20), dp(9), dp(20), dp(10))
+      background = rounded(Color.argb(190, 16, 24, 32), 18)
+      addView(phaseText, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(2) })
+      addView(statusText, LinearLayout.LayoutParams(-1, dp(30)))
     }
-    val calibration = LinearLayout(this).apply {
-      orientation = LinearLayout.VERTICAL
-      setPadding(dp(20), dp(14), dp(20), dp(16))
-      background = rounded(Color.argb(205, 16, 24, 32), 20)
-      addView(textView(11, Color.rgb(255, 181, 71)).apply {
-        letterSpacing = 0.12f
-        setTypeface(typeface, Typeface.BOLD)
-        setText(R.string.pushup_calibration_eyebrow)
+    val calibration = FrameLayout(this).apply {
+      setPadding(dp(16), dp(10), dp(16), dp(10))
+      background = rounded(Color.argb(178, 16, 24, 32), 16)
+      addView(qualityText, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
+    }
+    val backButton = Button(this).apply {
+      id = R.id.pushup_back
+      minHeight = dp(46)
+      setText(R.string.pushup_back_to_alarm)
+      setTextColor(Color.WHITE)
+      textSize = 13f
+      background = rounded(Color.argb(190, 30, 43, 54), 15)
+      setOnClickListener { finish() }
+    }
+    val topHud = LinearLayout(this).apply {
+      orientation = LinearLayout.HORIZONTAL
+      gravity = Gravity.TOP
+      addView(header, LinearLayout.LayoutParams(dp(190), -2))
+      addView(calibration, LinearLayout.LayoutParams(0, -2, 1f).apply {
+        leftMargin = dp(10)
+        rightMargin = dp(10)
       })
-      addView(qualityText, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+      addView(backButton, LinearLayout.LayoutParams(dp(170), dp(46)))
     }
     setContentView(FrameLayout(this).apply {
       setBackgroundColor(Color.rgb(16, 24, 32))
@@ -415,17 +425,13 @@ class PushUpMissionActivity : ComponentActivity() {
       addView(View(this@PushUpMissionActivity).apply {
         setBackgroundColor(Color.argb(35, 0, 0, 0))
       }, FrameLayout.LayoutParams(-1, -1))
-      addView(header, FrameLayout.LayoutParams(dp(300), -2, Gravity.TOP or Gravity.START).apply {
-        leftMargin = dp(20)
-        topMargin = dp(20)
+      addView(topHud, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
+        leftMargin = dp(14)
+        rightMargin = dp(14)
+        topMargin = dp(14)
       })
-      addView(footer, FrameLayout.LayoutParams(dp(360), -2, Gravity.BOTTOM or Gravity.END).apply {
-        rightMargin = dp(20)
-        bottomMargin = dp(20)
-      })
-      addView(calibration, FrameLayout.LayoutParams(dp(300), -2, Gravity.BOTTOM or Gravity.START).apply {
-        leftMargin = dp(20)
-        bottomMargin = dp(20)
+      addView(footer, FrameLayout.LayoutParams(dp(480), -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+        bottomMargin = dp(14)
       })
       addView(permissionPanel, FrameLayout.LayoutParams(dp(420), -2, Gravity.CENTER))
     })

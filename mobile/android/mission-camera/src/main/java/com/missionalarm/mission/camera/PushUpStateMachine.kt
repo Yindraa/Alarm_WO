@@ -3,19 +3,20 @@ package com.missionalarm.mission.camera
 /** Provisional M6 profile. Values must be qualified on the physical-device dataset before release. */
 data class PushUpProfile(
   val version: String = "pushup-profile-v0",
-  val setupStableMs: Long = 300,
-  val setupStableFrames: Int = 4,
-  val topEnterAngle: Double = 155.0,
-  val topExitAngle: Double = 145.0,
-  val bottomEnterAngle: Double = 95.0,
-  val bottomExitAngle: Double = 110.0,
-  val stableTopMs: Long = 250,
-  val stableTopFrames: Int = 3,
-  val stableBottomMs: Long = 150,
+  val setupStableMs: Long = 200,
+  val setupStableFrames: Int = 3,
+  val topEnterAngle: Double = 150.0,
+  val topExitAngle: Double = 140.0,
+  val bottomEnterAngle: Double = 105.0,
+  val bottomExitAngle: Double = 120.0,
+  val stableTopMs: Long = 180,
+  val stableTopFrames: Int = 2,
+  val stableBottomMs: Long = 100,
   val stableBottomFrames: Int = 2,
-  val minimumRepDurationMs: Long = 700,
+  val minimumRepDurationMs: Long = 600,
   val cooldownMs: Long = 300,
-  val lostBodyResetMs: Long = 750,
+  val lostBodyResetMs: Long = 1_000,
+  val transientQualityFailureToleranceFrames: Int = 1,
 ) {
   init {
     require(version.isNotBlank())
@@ -26,6 +27,7 @@ data class PushUpProfile(
     require(stableTopMs >= 0 && stableTopFrames > 0)
     require(stableBottomMs >= 0 && stableBottomFrames > 0)
     require(minimumRepDurationMs >= 0 && cooldownMs >= 0 && lostBodyResetMs >= 0)
+    require(transientQualityFailureToleranceFrames >= 0)
   }
 }
 
@@ -117,6 +119,7 @@ class PushUpStateMachine(
   private var firstTopAtMs: Long? = null
   private var cooldownStartedAtMs: Long? = null
   private var stableCandidate: StableCandidate? = null
+  private var transientQualityFailureFrames = 0
   private var quality = PushUpQualityStatus()
   private var feedback = if (phase == PushUpPhase.COMPLETE) {
     PushUpFeedback.MISSION_COMPLETE
@@ -147,11 +150,15 @@ class PushUpStateMachine(
 
     val qualityFeedback = qualityFeedback(observation)
     if (qualityFeedback != null) {
-      stableCandidate = null
+      transientQualityFailureFrames += 1
+      if (transientQualityFailureFrames > profile.transientQualityFailureToleranceFrames) {
+        stableCandidate = null
+      }
       feedback = qualityFeedback
       handleBodyLoss(observation)
       return update(accepted = true)
     }
+    transientQualityFailureFrames = 0
     lostBodySinceMs = null
 
     if (phase == PushUpPhase.SEEKING_BODY) {
@@ -182,7 +189,7 @@ class PushUpStateMachine(
       }
       PushUpPhase.TOP_CONFIRMED -> {
         feedback = PushUpFeedback.LOWER_BODY
-        if (sameSide(observation) && angle < profile.topExitAngle) {
+        if (sameSide(observation) && angle <= profile.topExitAngle) {
           phase = PushUpPhase.DESCENDING
         }
       }
@@ -201,7 +208,7 @@ class PushUpStateMachine(
       }
       PushUpPhase.BOTTOM_CONFIRMED -> {
         feedback = PushUpFeedback.PUSH_UP
-        if (sameSide(observation) && angle > profile.bottomExitAngle) {
+        if (sameSide(observation) && angle >= profile.bottomExitAngle) {
           phase = PushUpPhase.ASCENDING
         }
       }
@@ -308,6 +315,7 @@ class PushUpStateMachine(
     firstTopAtMs = null
     cooldownStartedAtMs = null
     stableCandidate = null
+    transientQualityFailureFrames = 0
   }
 
   private fun update(accepted: Boolean) = PushUpUpdate(

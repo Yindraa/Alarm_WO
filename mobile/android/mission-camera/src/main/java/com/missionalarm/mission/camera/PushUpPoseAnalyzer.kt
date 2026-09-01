@@ -36,6 +36,7 @@ internal class PushUpPoseAnalyzer(
   private var lastTimestampMs = -1L
   private var pendingFrame: PendingFrame? = null
   private var dispatchedProgress = initialCommittedReps
+  private var preferredSide: PushUpSide? = null
   private val poseLandmarker: PoseLandmarker
 
   init {
@@ -86,8 +87,13 @@ internal class PushUpPoseAnalyzer(
     pendingFrame = null
     inferenceInFlight.set(false)
     if (closed.get() || frame == null) return
-    val observation = PushUpFeatureExtractor.extract(sessionId, frame, result)
+    val observation = PushUpFeatureExtractor.extract(sessionId, frame, result, preferredSide)
     val update = stateMachine.process(observation)
+    preferredSide = when {
+      update.phase == PushUpPhase.SEEKING_BODY && !observation.fullBodyVisible -> null
+      preferredSide == null && observation.fullBodyVisible -> observation.selectedSide
+      else -> preferredSide
+    }
     onUpdate(update)
     if (update.committedReps > dispatchedProgress) {
       dispatchedProgress = update.committedReps
@@ -149,6 +155,7 @@ internal object PushUpFeatureExtractor {
     sessionId: String,
     frame: PushUpPoseAnalyzer.PendingFrame,
     result: PoseLandmarkerResult,
+    preferredSide: PushUpSide? = null,
   ): PushUpObservation {
     val landmarks = result.landmarks().firstOrNull()
       ?: return missingObservation(sessionId, frame)
@@ -160,7 +167,8 @@ internal object PushUpFeatureExtractor {
 
     val left = side(landmarks, PushUpSide.LEFT, frame.width, frame.height)
     val right = side(landmarks, PushUpSide.RIGHT, frame.width, frame.height)
-    val selected = if (left.quality >= right.quality) left else right
+    val selectedSide = selectSide(preferredSide, left.quality, right.quality)
+    val selected = if (selectedSide == PushUpSide.LEFT) left else right
     val sideOnScore = sideOnScore(world)
     val fullBodyVisible = selected.points.all {
       it.visibility >= MIN_CONFIDENCE && it.presence >= MIN_CONFIDENCE &&
@@ -197,6 +205,13 @@ internal object PushUpFeatureExtractor {
     poseDetected = false,
     lowLight = frame.lowLight,
   )
+
+  /** Keeps one anatomical side stable until body-loss recovery starts a new setup cycle. */
+  internal fun selectSide(
+    preferredSide: PushUpSide?,
+    leftQuality: Double,
+    rightQuality: Double,
+  ): PushUpSide = preferredSide ?: if (leftQuality >= rightQuality) PushUpSide.LEFT else PushUpSide.RIGHT
 
   private fun side(
     landmarks: List<NormalizedLandmark>,
@@ -305,13 +320,13 @@ internal object PushUpFeatureExtractor {
   private val RIGHT_INDICES = listOf(12, 14, 16, 24, 26, 28)
   private const val LANDMARK_COUNT = 29
   private const val MIN_CONFIDENCE = 0.60
-  private const val FRAME_MIN = 0.02
-  private const val FRAME_MAX = 0.98
+  private const val FRAME_MIN = -0.02
+  private const val FRAME_MAX = 1.02
   private const val MIN_BODY_SCALE = 0.35
-  private const val MAX_BODY_EXTENT = 0.95
-  private const val MIN_SIDE_ON_SCORE = 0.60
-  private const val MIN_HIP_ANGLE = 150.0
-  private const val MIN_KNEE_ANGLE = 155.0
-  private const val MAX_BODY_TILT = 35.0
+  private const val MAX_BODY_EXTENT = 1.02
+  private const val MIN_SIDE_ON_SCORE = 0.50
+  private const val MIN_HIP_ANGLE = 145.0
+  private const val MIN_KNEE_ANGLE = 150.0
+  private const val MAX_BODY_TILT = 40.0
   private const val EPSILON = 1e-6
 }

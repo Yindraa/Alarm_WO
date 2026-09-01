@@ -15,8 +15,8 @@
   <string name="code_scan_close">Kembali</string>
   <string name="pushup_eyebrow">MISI PUSH-UP · DAWN FOCUS</string>
   <string name="pushup_progress">%1$d / %2$d repetisi</string>
-  <string name="pushup_calibration_eyebrow">KALIBRASI LANGSUNG</string>
-  <string name="pushup_quality_body">%1$s Tubuh terdeteksi\n%2$s Seluruh tubuh terlihat\n%3$s Posisi menyamping\n%4$s Cahaya cukup\n%5$s Tubuh lurus</string>
+  <string name="pushup_quality_body">%1$s Tubuh   %2$s Frame   %3$s Samping   %4$s Cahaya   %5$s Lurus</string>
+  <string name="pushup_quality_ready">✓ Posisi siap · ikuti arahan gerakan</string>
   <string name="pushup_gate_pass">✓</string>
   <string name="pushup_gate_wait">○</string>
   <string name="pushup_phase_seeking_body">Fase · Mencari tubuh</string>
@@ -38,7 +38,7 @@
   <string name="pushup_rise">Dorong kembali ke posisi atas.</string>
   <string name="pushup_rep_counted">Repetisi berhasil dihitung.</string>
   <string name="pushup_complete">Target tercapai. Alarm dihentikan.</string>
-  <string name="pushup_back_to_alarm">Kembali ke layar alarm / darurat</string>
+  <string name="pushup_back_to_alarm">Alarm / darurat</string>
   <string name="pushup_recovery_title">Deteksi perlu dipulihkan</string>
   <string name="pushup_recovery_body">Progress yang sudah valid tetap tersimpan. Coba lagi atau kembali ke layar alarm untuk akses darurat.</string>
   <string name="pushup_open_settings">Buka pengaturan kamera</string>

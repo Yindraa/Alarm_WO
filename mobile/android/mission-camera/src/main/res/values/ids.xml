@@ -7,5 +7,6 @@
   <item name="pushup_status" type="id" />
   <item name="pushup_phase" type="id" />
   <item name="pushup_quality" type="id" />
+  <item name="pushup_back" type="id" />
   <item name="pushup_recovery_panel" type="id" />
 </resources>
