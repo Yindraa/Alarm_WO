@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
@@ -220,6 +221,7 @@ class CodeScanActivity : ComponentActivity() {
         gravity = Gravity.CENTER
         setTypeface(typeface, Typeface.BOLD)
         setText(R.string.code_camera_permission_title)
+        if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
       })
       addView(textView(14, Color.rgb(205, 216, 224)).apply {
         gravity = Gravity.CENTER
@@ -243,6 +245,7 @@ class CodeScanActivity : ComponentActivity() {
         setPadding(0, dp(6), 0, dp(4))
         setTypeface(typeface, Typeface.BOLD)
         setText(R.string.code_scan_title)
+        if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
       })
       addView(textView(15, Color.rgb(224, 231, 236)).apply {
         gravity = Gravity.CENTER

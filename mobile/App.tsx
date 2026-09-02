@@ -350,7 +350,9 @@ function HomeShell({
           </View>
         </View>
         <View
+          accessible
           accessibilityLabel="Aplikasi dapat digunakan offline"
+          accessibilityRole="text"
           style={[
             styles.offlineBadge,
             { backgroundColor: colors.successSurface },
@@ -384,6 +386,7 @@ function HomeShell({
             </Text>
             <View style={styles.homeErrorActions}>
               <Pressable
+                accessibilityLabel="Tutup pesan kesalahan"
                 accessibilityRole="button"
                 onPress={() => setFailedToggle(null)}
                 style={styles.inlineAction}
@@ -398,7 +401,9 @@ function HomeShell({
                 </Text>
               </Pressable>
               <Pressable
+                accessibilityLabel="Coba lagi mengubah status alarm"
                 accessibilityRole="button"
+                accessibilityState={{ disabled: pendingAlarmId !== null }}
                 disabled={pendingAlarmId !== null}
                 onPress={retryFailedToggle}
                 style={styles.inlineAction}
@@ -470,10 +475,16 @@ function HomeShell({
         )}
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+          <Text
+            accessibilityRole="header"
+            style={[styles.sectionTitle, { color: colors.text }]}
+          >
             Alarm saya
           </Text>
           <View
+            accessible
+            accessibilityLabel={`${home.alarms.length} alarm tersimpan`}
+            accessibilityRole="text"
             style={[
               styles.countBadge,
               { backgroundColor: colors.primarySurface },
@@ -523,7 +534,13 @@ function HomeShell({
                 >
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Edit alarm ${alarm.label}`}
+                    accessibilityLabel={`${alarm.label}, pukul ${formatTime(
+                      alarm.localTimeMinutes,
+                    )}, ${repeatLabel(
+                      alarm.repeatDaysMask,
+                    )}, ${missionLabel(alarm.missionType, alarm.target)}`}
+                    accessibilityHint="Buka editor alarm"
+                    accessibilityState={{ disabled: pending }}
                     disabled={pending}
                     onPress={() => onOpenEditor(alarm.id)}
                     style={styles.alarmEditAction}
@@ -585,11 +602,16 @@ function HomeShell({
                       alarm.enabled ? 'Nonaktifkan' : 'Aktifkan'
                     } alarm ${alarm.label}`}
                     accessibilityRole="switch"
+                    accessibilityHint={`${
+                      alarm.enabled ? 'Nonaktifkan' : 'Aktifkan'
+                    } alarm`}
                     accessibilityState={{
                       checked: alarm.enabled,
                       disabled: pending,
+                      busy: pending,
                     }}
                     disabled={pending}
+                    hitSlop={SWITCH_HIT_SLOP}
                     onPress={() => runToggle(alarm)}
                     style={[
                       styles.alarmToggle,
@@ -619,7 +641,10 @@ function HomeShell({
 
         {home.recentHistory.length > 0 && (
           <View style={styles.historySection}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            <Text
+              accessibilityRole="header"
+              style={[styles.sectionTitle, { color: colors.text }]}
+            >
               Riwayat terbaru
             </Text>
             {home.recentHistory.map(item => (
@@ -811,7 +836,7 @@ function EditorShell({
         </View>
       </View>
       {state.status === 'loading' && (
-        <View style={styles.editorStatus}>
+        <View accessibilityLiveRegion="polite" style={styles.editorStatus}>
           <ActivityIndicator color={colors.primary} />
           <Text style={[styles.body, { color: colors.secondary }]}>
             Memuat konfigurasi…
@@ -819,7 +844,7 @@ function EditorShell({
         </View>
       )}
       {state.status === 'error' && (
-        <View style={styles.editorStatus}>
+        <View accessibilityLiveRegion="assertive" style={styles.editorStatus}>
           <Text style={[styles.heading, { color: colors.danger }]}>
             Konfigurasi belum tersedia
           </Text>
@@ -934,6 +959,10 @@ function EditorShell({
               </Text>
             )}
             <View
+              accessible
+              accessibilityLabel={`Ringkasan jadwal: ${scheduleSummary(
+                state.form,
+              )}`}
               style={[
                 styles.scheduleSummary,
                 { backgroundColor: colors.primarySurface },
@@ -968,6 +997,7 @@ function EditorShell({
           <EditorSection colors={colors} eyebrow="IDENTITAS" title="Nama alarm">
             <TextInput
               accessibilityLabel="Label alarm"
+              accessibilityHint="Maksimal 80 karakter"
               maxLength={80}
               onChangeText={label => updateForm({ label })}
               placeholder="Alarm"
@@ -1046,6 +1076,11 @@ function EditorShell({
                   />
                   <TextInput
                     accessibilityLabel="Target misi"
+                    accessibilityHint={`Masukkan target ${
+                      state.form.missionType === 'MATH'
+                        ? 'antara 1 dan 10'
+                        : 'antara 1 dan 50'
+                    }`}
                     keyboardType="number-pad"
                     maxLength={2}
                     onChangeText={target =>
@@ -1144,7 +1179,14 @@ function EditorShell({
             </View>
           )}
           <Pressable
+            accessibilityLabel={
+              state.saving ? 'Menyimpan alarm' : 'Simpan alarm'
+            }
             accessibilityRole="button"
+            accessibilityState={{
+              busy: state.saving,
+              disabled: state.saving || currentValidation !== null,
+            }}
             disabled={state.saving || currentValidation !== null}
             onPress={save}
             style={[
@@ -1194,7 +1236,10 @@ function EditorSection({
       <Text style={[styles.editorSectionEyebrow, { color: colors.primary }]}>
         {eyebrow}
       </Text>
-      <Text style={[styles.editorSectionTitle, { color: colors.text }]}>
+      <Text
+        accessibilityRole="header"
+        style={[styles.editorSectionTitle, { color: colors.text }]}
+      >
         {title}
       </Text>
       {children}
@@ -1234,6 +1279,7 @@ function MissionCard({
   return (
     <Pressable
       accessibilityLabel={label}
+      accessibilityHint={description}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
@@ -1280,6 +1326,7 @@ function StepperButton({
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
+      hitSlop={COMPACT_HIT_SLOP}
       onPress={onPress}
       style={styles.stepperButton}
     >
@@ -1311,6 +1358,7 @@ function TimeUnit({
       <View style={styles.timeValueBox}>
         <TextInput
           accessibilityLabel={accessibilityLabel}
+          accessibilityHint={`Masukkan angka 0 sampai ${max}`}
           keyboardType="number-pad"
           maxLength={2}
           onChangeText={next => onChange(digitsOnly(next))}
@@ -1323,6 +1371,7 @@ function TimeUnit({
         <Pressable
           accessibilityLabel={`Kurangi ${label.toLowerCase()}`}
           accessibilityRole="button"
+          hitSlop={COMPACT_HIT_SLOP}
           onPress={() => onChange(stepClockValue(value, -step, max))}
           style={styles.timeAdjustButton}
         >
@@ -1331,6 +1380,7 @@ function TimeUnit({
         <Pressable
           accessibilityLabel={`Tambah ${label.toLowerCase()}`}
           accessibilityRole="button"
+          hitSlop={COMPACT_HIT_SLOP}
           onPress={() => onChange(stepClockValue(value, step, max))}
           style={styles.timeAdjustButton}
         >
@@ -1392,8 +1442,8 @@ function DayOption({
 }>) {
   return (
     <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="radio"
+      accessibilityLabel={weekdayAccessibilityLabel(label)}
+      accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
       style={[
@@ -1448,6 +1498,22 @@ const WEEKDAYS = [
   { label: 'Sab', bit: 32 },
   { label: 'Min', bit: 64 },
 ] as const;
+
+const COMPACT_HIT_SLOP = { bottom: 2, left: 2, right: 2, top: 2 } as const;
+const SWITCH_HIT_SLOP = { bottom: 8, left: 0, right: 0, top: 8 } as const;
+
+function weekdayAccessibilityLabel(label: string): string {
+  const labels: Record<string, string> = {
+    Sen: 'Senin',
+    Sel: 'Selasa',
+    Rab: 'Rabu',
+    Kam: 'Kamis',
+    Jum: 'Jumat',
+    Sab: 'Sabtu',
+    Min: 'Minggu',
+  };
+  return labels[label] ?? label;
+}
 
 function editorForm(snapshot: AlarmEditorSnapshot): EditorForm {
   const alarm = snapshot.alarm;

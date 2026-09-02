@@ -311,6 +311,11 @@ class PushUpMissionActivity : ComponentActivity() {
 
   private fun renderProgress() {
     progressText.text = getString(R.string.pushup_progress, committedProgress, target)
+    progressText.contentDescription = getString(
+      R.string.pushup_progress,
+      committedProgress,
+      target,
+    )
     progressBar.max = maxOf(1, target)
     progressBar.progress = committedProgress
   }
@@ -374,6 +379,7 @@ class PushUpMissionActivity : ComponentActivity() {
     statusText = textView(16, Color.WHITE).apply {
       id = R.id.pushup_status
       gravity = Gravity.CENTER
+      minHeight = dp(30)
       accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     }
     phaseText = textView(12, Color.rgb(255, 181, 71)).apply {
@@ -406,6 +412,7 @@ class PushUpMissionActivity : ComponentActivity() {
         setTypeface(typeface, Typeface.BOLD)
         gravity = Gravity.CENTER
         setText(R.string.pushup_recovery_title)
+        if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
       })
       addView(textView(14, Color.rgb(205, 216, 224)).apply {
         gravity = Gravity.CENTER
@@ -432,7 +439,7 @@ class PushUpMissionActivity : ComponentActivity() {
       setPadding(dp(20), dp(9), dp(20), dp(10))
       background = rounded(Color.argb(190, 16, 24, 32), 18)
       addView(phaseText, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(2) })
-      addView(statusText, LinearLayout.LayoutParams(-1, dp(30)))
+      addView(statusText, LinearLayout.LayoutParams(-1, -2))
     }
     val calibration = FrameLayout(this).apply {
       setPadding(dp(16), dp(10), dp(16), dp(10))
@@ -441,7 +448,7 @@ class PushUpMissionActivity : ComponentActivity() {
     }
     val backButton = Button(this).apply {
       id = R.id.pushup_back
-      minHeight = dp(46)
+      minHeight = dp(48)
       setText(R.string.pushup_back_to_alarm)
       setTextColor(Color.WHITE)
       textSize = 13f
@@ -456,7 +463,7 @@ class PushUpMissionActivity : ComponentActivity() {
         leftMargin = dp(10)
         rightMargin = dp(10)
       })
-      addView(backButton, LinearLayout.LayoutParams(dp(170), dp(46)))
+      addView(backButton, LinearLayout.LayoutParams(dp(170), dp(48)))
     }
     setContentView(FrameLayout(this).apply {
       setBackgroundColor(Color.rgb(16, 24, 32))

@@ -175,6 +175,28 @@ describe('application startup recovery gate', () => {
     expect(view.getByText('Sen–Jum • Pukul 08:55')).toBeOnTheScreen();
   });
 
+  it('exposes weekly days as independent checkboxes', async () => {
+    getActiveRuntimeSnapshotMock.mockResolvedValue(noActiveSnapshot());
+    const user = userEvent.setup();
+
+    const view = await render(<App />);
+    await view.findByText('Belum ada alarm');
+    await user.press(view.getByRole('button', { name: 'Tambah alarm' }));
+    await view.findByText('Buat alarm');
+
+    expect(
+      view.getByRole('checkbox', { name: 'Senin', checked: true }),
+    ).toBeOnTheScreen();
+    const saturday = view.getByRole('checkbox', {
+      name: 'Sabtu',
+      checked: false,
+    });
+    await user.press(saturday);
+    expect(
+      view.getByRole('checkbox', { name: 'Sabtu', checked: true }),
+    ).toBeOnTheScreen();
+  });
+
   it('configures Scan without asking the user to register a code', async () => {
     getActiveRuntimeSnapshotMock.mockResolvedValue(noActiveSnapshot());
     const user = userEvent.setup();
@@ -404,7 +426,9 @@ describe('application startup recovery gate', () => {
     expect(view.getByText('Sen–Jum')).toBeOnTheScreen();
     await act(async () => {
       fireEvent.press(
-        view.getByRole('button', { name: 'Edit alarm Pagi kerja' }),
+        view.getByRole('button', {
+          name: /Pagi kerja, pukul 06:30, Sen–Jum, Math · 3/,
+        }),
       );
     });
     expect(await view.findByText('Edit alarm')).toBeOnTheScreen();
@@ -481,7 +505,11 @@ describe('application startup recovery gate', () => {
     expect(
       await view.findByText(/Akses Alarm & pengingat belum tersedia/),
     ).toBeOnTheScreen();
-    await user.press(view.getByRole('button', { name: 'Coba lagi' }));
+    await user.press(
+      view.getByRole('button', {
+        name: 'Coba lagi mengubah status alarm',
+      }),
+    );
 
     await waitFor(() => expect(enableAlarmMock).toHaveBeenCalledTimes(2));
     expect(enableAlarmMock.mock.calls[1][0].commandId).toBe(
