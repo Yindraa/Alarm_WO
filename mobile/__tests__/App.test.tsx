@@ -423,7 +423,7 @@ describe('application startup recovery gate', () => {
 
     expect((await view.findAllByText('06:30')).length).toBeGreaterThan(0);
     expect(view.getAllByText(/Pagi kerja/).length).toBeGreaterThan(0);
-    expect(view.getByText('Sen–Jum')).toBeOnTheScreen();
+    expect(view.getAllByText('Sen–Jum').length).toBeGreaterThan(0);
     await act(async () => {
       fireEvent.press(
         view.getByRole('button', {

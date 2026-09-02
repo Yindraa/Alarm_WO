@@ -164,7 +164,6 @@ function App() {
       <HomeShell
         colors={colors}
         home={state.home}
-        info={state.info}
         onOpenEditor={alarmId => setScreen({ name: 'editor', alarmId })}
         onRefresh={() => refreshReadyHome(state.info)}
       />
@@ -236,13 +235,11 @@ function RecoveryGate({
 function HomeShell({
   colors,
   home,
-  info,
   onOpenEditor,
   onRefresh,
 }: Readonly<{
   colors: Colors;
   home: HomeSnapshot;
-  info: ContractInfo;
   onOpenEditor: (alarmId: string | null) => void;
   onRefresh: () => Promise<void>;
 }>) {
@@ -328,42 +325,26 @@ function HomeShell({
   return (
     <View style={styles.homeContainer}>
       <View style={styles.topBar}>
-        <View style={styles.brandGroup}>
-          <View
-            accessible={false}
-            style={[styles.brandMark, { backgroundColor: colors.hero }]}
+        <View style={styles.ritualHeading}>
+          <Text style={[styles.ritualGreeting, { color: colors.primary }]}>
+            {morningGreeting()}
+          </Text>
+          <Text
+            accessibilityRole="header"
+            style={[styles.homeTitle, { color: colors.text }]}
           >
-            <View
-              style={[styles.brandSun, { backgroundColor: colors.amber }]}
-            />
-          </View>
-          <View>
-            <Text
-              accessibilityRole="header"
-              style={[styles.homeTitle, { color: colors.text }]}
-            >
-              Mission Alarm
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
-              Bangun dengan tujuan
-            </Text>
-          </View>
+            Mission Alarm
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: colors.secondary }]}>
+            {formatHomeDate(new Date())}
+          </Text>
         </View>
         <View
-          accessible
-          accessibilityLabel="Aplikasi dapat digunakan offline"
-          accessibilityRole="text"
-          style={[
-            styles.offlineBadge,
-            { backgroundColor: colors.successSurface },
-          ]}
+          accessible={false}
+          style={[styles.ritualMark, { borderColor: colors.border }]}
         >
-          <View
-            style={[styles.offlineDot, { backgroundColor: colors.success }]}
-          />
-          <Text style={[styles.offlineLabel, { color: colors.success }]}>
-            Offline
-          </Text>
+          <View style={[styles.ritualSun, { backgroundColor: colors.amber }]} />
+          <View style={[styles.ritualHorizon, { backgroundColor: colors.text }]} />
         </View>
       </View>
       <ScrollView
@@ -418,39 +399,39 @@ function HomeShell({
           </View>
         )}
         {nextAlarm ? (
-          <View style={[styles.nextCard, { backgroundColor: colors.hero }]}>
+          <View
+            accessible
+            accessibilityLabel={`Alarm berikutnya ${nextAlarm.label}, pukul ${formatTime(
+              nextAlarm.localTimeMinutes,
+            )}, ${repeatLabel(nextAlarm.repeatDaysMask)}, ${missionLabel(
+              nextAlarm.missionType,
+              nextAlarm.target,
+            )}`}
+            style={[styles.nextCard, { backgroundColor: colors.hero }]}
+          >
             <View
               accessible={false}
-              style={[
-                styles.heroGlowLarge,
-                { backgroundColor: colors.primary },
-              ]}
+              style={styles.sunriseStage}
             />
             <View
               accessible={false}
-              style={[styles.heroGlowSmall, { backgroundColor: colors.amber }]}
+              style={[styles.sunriseOrb, { backgroundColor: colors.amber }]}
             />
-            <Text style={styles.nextEyebrow}>ALARM BERIKUTNYA</Text>
+            <View accessible={false} style={styles.sunriseArc} />
+            <Text style={styles.nextEyebrow}>BERIKUTNYA</Text>
             <Text style={styles.nextTime}>
               {formatTime(nextAlarm.localTimeMinutes)}
             </Text>
             <Text style={styles.nextTitle}>{nextAlarm.label}</Text>
+            <View style={styles.heroRule} />
             <View style={styles.nextMetaRow}>
-              <View style={styles.nextMetaPill}>
-                <Text style={styles.nextMetaText}>
-                  Jadwal {repeatLabel(nextAlarm.repeatDaysMask)}
-                </Text>
-              </View>
-              <View style={styles.nextMetaPill}>
-                <Text style={styles.nextMetaText}>
-                  {missionSymbol(nextAlarm.missionType)}{' '}
-                  {missionLabel(nextAlarm.missionType, nextAlarm.target)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.readyRow}>
-              <View style={styles.readyDot} />
-              <Text style={styles.readyLabel}>Siap membangunkanmu</Text>
+              <Text style={styles.nextMetaText}>
+                {repeatLabel(nextAlarm.repeatDaysMask)}
+              </Text>
+              <View style={styles.metaDivider} />
+              <Text style={styles.nextMetaText}>
+                {missionEditorialLabel(nextAlarm.missionType, nextAlarm.target)}
+              </Text>
             </View>
           </View>
         ) : (
@@ -458,80 +439,95 @@ function HomeShell({
             style={[
               styles.nextCard,
               styles.quietHero,
-              { backgroundColor: colors.primarySurface },
+              { backgroundColor: colors.hero },
             ]}
           >
-            <Text style={[styles.quietHeroEyebrow, { color: colors.primary }]}>
-              MULAI RUTINITAS
+            <View
+              accessible={false}
+              style={[styles.emptySun, { backgroundColor: colors.amber }]}
+            />
+            <Text style={styles.quietHeroEyebrow}>RITUAL PERTAMA</Text>
+            <Text style={styles.quietHeroTitle}>
+              Atur satu alasan untuk bangun.
             </Text>
-            <Text style={[styles.quietHeroTitle, { color: colors.text }]}>
-              Pagi yang fokus dimulai dari satu alarm.
-            </Text>
-            <Text style={[styles.quietHeroBody, { color: colors.secondary }]}>
-              Pilih waktu, tentukan misi, lalu biarkan Mission Alarm menjaga
-              komitmenmu.
+            <Text style={styles.quietHeroBody}>
+              Pilih waktu dan misi. Sisanya berjalan offline.
             </Text>
           </View>
         )}
 
         <View style={styles.sectionHeader}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionTitle, { color: colors.text }]}
-          >
-            Alarm saya
-          </Text>
-          <View
-            accessible
-            accessibilityLabel={`${home.alarms.length} alarm tersimpan`}
-            accessibilityRole="text"
-            style={[
-              styles.countBadge,
-              { backgroundColor: colors.primarySurface },
-            ]}
-          >
-            <Text style={[styles.countLabel, { color: colors.primary }]}>
-              {home.alarms.length}
+          <View style={styles.sectionHeadingGroup}>
+            <Text
+              accessibilityRole="header"
+              style={[styles.sectionTitle, { color: colors.text }]}
+            >
+              Alarm
+            </Text>
+            <Text style={[styles.sectionMeta, { color: colors.secondary }]}>
+              {home.alarms.length} tersimpan
             </Text>
           </View>
+          <Pressable
+            accessibilityLabel="Tambah alarm"
+            accessibilityRole="button"
+            onPress={() => onOpenEditor(null)}
+            style={[styles.compactAdd, { borderColor: colors.border }]}
+          >
+            <View style={styles.addGlyph}>
+              <View style={[styles.addGlyphHorizontal, { backgroundColor: colors.text }]} />
+              <View style={[styles.addGlyphVertical, { backgroundColor: colors.text }]} />
+            </View>
+            <Text style={[styles.compactAddLabel, { color: colors.text }]}>Baru</Text>
+          </Pressable>
         </View>
 
         {home.alarms.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
-            <View
-              style={[
-                styles.emptyIcon,
-                { backgroundColor: colors.primarySurface },
-              ]}
-            >
-              <Text style={[styles.emptyIconText, { color: colors.primary }]}>
-                +
-              </Text>
-            </View>
+          <Pressable
+            accessibilityLabel="Tambah alarm pertama"
+            accessibilityRole="button"
+            onPress={() => onOpenEditor(null)}
+            style={[styles.emptyCard, { borderColor: colors.border }]}
+          >
             <Text style={[styles.emptyHeading, { color: colors.text }]}>
               Belum ada alarm
             </Text>
             <Text style={[styles.emptyBody, { color: colors.secondary }]}>
-              Buat alarm pertamamu dan pilih misi yang harus diselesaikan saat
-              alarm berbunyi.
+              Sentuh untuk menyusun ritual pertamamu.
             </Text>
-          </View>
+            <Text style={[styles.emptyArrow, { color: colors.primary }]}>→</Text>
+          </Pressable>
         ) : (
-          <View style={styles.alarmList}>
-            {home.alarms.map(alarm => {
+          <View
+            style={[
+              styles.alarmList,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            {home.alarms.map((alarm, index) => {
               const pending = pendingAlarmId === alarm.id;
               return (
                 <View
                   key={alarm.id}
-                  style={[
-                    styles.alarmRow,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                      shadowColor: colors.shadow,
-                    },
-                  ]}
+                  style={styles.alarmRow}
                 >
+                  {index > 0 && (
+                    <View
+                      accessible={false}
+                      style={[styles.alarmDivider, { backgroundColor: colors.border }]}
+                    />
+                  )}
+                  <View
+                    accessible={false}
+                    style={[
+                      styles.alarmRail,
+                      {
+                        backgroundColor: alarm.enabled
+                          ? colors.amber
+                          : colors.border,
+                      },
+                    ]}
+                  />
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`${alarm.label}, pukul ${formatTime(
@@ -547,24 +543,21 @@ function HomeShell({
                   >
                     <View
                       style={[
-                        styles.missionIcon,
+                        styles.missionStamp,
                         {
-                          backgroundColor: missionSurface(
-                            alarm.missionType,
-                            colors,
-                          ),
+                          borderColor: missionColor(alarm.missionType, colors),
                         },
                       ]}
                     >
                       <Text
                         style={[
-                          styles.missionIconText,
+                          styles.missionStampText,
                           {
                             color: missionColor(alarm.missionType, colors),
                           },
                         ]}
                       >
-                        {missionSymbol(alarm.missionType)}
+                        {missionStamp(alarm.missionType)}
                       </Text>
                     </View>
                     <View style={styles.alarmTimeColumn}>
@@ -641,45 +634,33 @@ function HomeShell({
 
         {home.recentHistory.length > 0 && (
           <View style={styles.historySection}>
-            <Text
-              accessibilityRole="header"
-              style={[styles.sectionTitle, { color: colors.text }]}
-            >
-              Riwayat terbaru
-            </Text>
-            {home.recentHistory.map(item => (
+            <View style={styles.sectionHeader}>
+              <Text
+                accessibilityRole="header"
+                style={[styles.sectionTitle, { color: colors.text }]}
+              >
+                Baru selesai
+              </Text>
+              <View style={[styles.sectionLine, { backgroundColor: colors.border }]} />
+            </View>
+            <View style={[styles.historyList, { borderColor: colors.border }]}>
+              {home.recentHistory.map(item => (
               <View
                 key={item.instanceId}
-                style={[
-                  styles.historyItem,
-                  { backgroundColor: colors.surface },
-                ]}
+                style={styles.historyItem}
               >
-                <View
-                  style={[
-                    styles.historyResult,
-                    { backgroundColor: colors.successSurface },
-                  ]}
-                >
-                  <Text style={{ color: colors.success }}>✓</Text>
+                <View style={[styles.historyResult, { borderColor: colors.success }]}>
+                  <View style={[styles.historyResultDot, { backgroundColor: colors.success }]} />
                 </View>
                 <Text style={[styles.historyText, { color: colors.secondary }]}>
                   {missionLabel(item.missionType, item.target)} diselesaikan
                 </Text>
               </View>
-            ))}
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
-      <PrimaryButton
-        colors={colors}
-        label="Tambah alarm"
-        onPress={() => onOpenEditor(null)}
-        leading="＋"
-      />
-      <Text style={[styles.buildInfo, { color: colors.secondary }]}>
-        Kontrak native v{info.contractVersion} · build {info.nativeBuildVersion}
-      </Text>
     </View>
   );
 }
@@ -854,11 +835,12 @@ function EditorShell({
         </View>
       )}
       {state.status === 'ready' && (
-        <ScrollView
-          contentContainerStyle={styles.editorContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.editorReady}>
+          <ScrollView
+            contentContainerStyle={styles.editorContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <View
             style={[
               styles.timeCard,
@@ -915,14 +897,12 @@ function EditorShell({
               <ScheduleOption
                 colors={colors}
                 label="Mingguan"
-                symbol="↻"
                 selected={state.form.scheduleKind === 'WEEKLY'}
                 onPress={() => updateForm({ scheduleKind: 'WEEKLY' })}
               />
               <ScheduleOption
                 colors={colors}
                 label="Sekali"
-                symbol="1×"
                 selected={state.form.scheduleKind === 'ONE_TIME'}
                 onPress={() => updateForm({ scheduleKind: 'ONE_TIME' })}
               />
@@ -1024,7 +1004,7 @@ function EditorShell({
                 colors={colors}
                 label="Math"
                 description="Selesaikan soal"
-                symbol="∑"
+                symbol="MA"
                 tone="blue"
                 selected={state.form.missionType === 'MATH'}
                 onPress={() => updateForm({ missionType: 'MATH', target: '3' })}
@@ -1033,7 +1013,7 @@ function EditorShell({
                 colors={colors}
                 label="Push-up"
                 description="Aktifkan tubuh"
-                symbol="P"
+                symbol="PU"
                 tone="amber"
                 selected={state.form.missionType === 'PUSH_UP'}
                 onPress={() =>
@@ -1044,7 +1024,7 @@ function EditorShell({
                 colors={colors}
                 label="Scan"
                 description="QR atau barcode"
-                symbol="▦"
+                symbol="SC"
                 tone="violet"
                 selected={state.form.missionType === 'QR'}
                 onPress={() => updateForm({ missionType: 'QR', target: '1' })}
@@ -1124,7 +1104,7 @@ function EditorShell({
                 ]}
               >
                 <Text style={[styles.soundIconText, { color: colors.primary }]}>
-                  ♪
+                  AU
                 </Text>
               </View>
               <View style={styles.soundCopy}>
@@ -1178,6 +1158,16 @@ function EditorShell({
               </Text>
             </View>
           )}
+          </ScrollView>
+          <View
+            style={[
+              styles.editorActionDock,
+              {
+                backgroundColor: colors.background,
+                borderTopColor: colors.border,
+              },
+            ]}
+          >
           <Pressable
             accessibilityLabel={
               state.saving ? 'Menyimpan alarm' : 'Simpan alarm'
@@ -1205,7 +1195,8 @@ function EditorShell({
               <Text style={styles.primaryLabel}>Simpan alarm</Text>
             )}
           </Pressable>
-        </ScrollView>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -1226,16 +1217,15 @@ function EditorSection({
     <View
       style={[
         styles.editorCard,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          shadowColor: colors.shadow,
-        },
+        { borderBottomColor: colors.border },
       ]}
     >
-      <Text style={[styles.editorSectionEyebrow, { color: colors.primary }]}>
-        {eyebrow}
-      </Text>
+      <View style={styles.editorSectionMarker}>
+        <Text style={[styles.editorSectionEyebrow, { color: colors.primary }]}>
+          {eyebrow}
+        </Text>
+        <View style={[styles.editorSectionRule, { backgroundColor: colors.border }]} />
+      </View>
       <Text
         accessibilityRole="header"
         style={[styles.editorSectionTitle, { color: colors.text }]}
@@ -1268,14 +1258,9 @@ function MissionCard({
     tone === 'amber'
       ? colors.amber
       : tone === 'violet'
-      ? '#8B78E6'
+      ? colors.secondary
       : colors.primary;
-  const surface =
-    tone === 'amber'
-      ? '#FFF1D7'
-      : tone === 'violet'
-      ? '#EEEAFE'
-      : colors.primarySurface;
+  const surface = colors.surfaceMuted;
   return (
     <Pressable
       accessibilityLabel={label}
@@ -1394,13 +1379,11 @@ function TimeUnit({
 function ScheduleOption({
   colors,
   label,
-  symbol,
   selected,
   onPress,
 }: Readonly<{
   colors: Colors;
   label: string;
-  symbol: string;
   selected: boolean;
   onPress: () => void;
 }>) {
@@ -1419,9 +1402,18 @@ function ScheduleOption({
         },
       ]}
     >
-      <Text style={[styles.scheduleOptionSymbol, { color: colors.primary }]}>
-        {symbol}
-      </Text>
+      <View
+        style={[
+          styles.scheduleIndicator,
+          { borderColor: selected ? colors.primary : colors.secondary },
+        ]}
+      >
+        {selected && (
+          <View
+            style={[styles.scheduleIndicatorCore, { backgroundColor: colors.primary }]}
+          />
+        )}
+      </View>
       <Text style={[styles.scheduleOptionLabel, { color: colors.text }]}>
         {label}
       </Text>
@@ -1780,8 +1772,13 @@ function missionLabel(type: string, target: number): string {
   return type === 'QR' ? name : `${name} · ${target}`;
 }
 
-function missionSymbol(type: string): string {
-  return type === 'PUSH_UP' ? 'P' : type === 'QR' ? '▦' : '∑';
+function missionEditorialLabel(type: string, target: number): string {
+  const name = type === 'PUSH_UP' ? 'GERAK' : type === 'QR' ? 'SCAN' : 'FOKUS';
+  return type === 'QR' ? name : `${name} ${target}`;
+}
+
+function missionStamp(type: string): string {
+  return type === 'PUSH_UP' ? 'PU' : type === 'QR' ? 'SC' : 'MA';
 }
 
 function missionColor(type: string, colors: Colors): string {
@@ -1792,12 +1789,20 @@ function missionColor(type: string, colors: Colors): string {
     : colors.primary;
 }
 
-function missionSurface(type: string, colors: Colors): string {
-  return type === 'PUSH_UP'
-    ? '#FFF1D7'
-    : type === 'QR'
-    ? '#EEEAFE'
-    : colors.primarySurface;
+function morningGreeting(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour < 11) return 'SELAMAT PAGI';
+  if (hour < 15) return 'SELAMAT SIANG';
+  if (hour < 18) return 'SELAMAT SORE';
+  return 'SELAMAT MALAM';
+}
+
+function formatHomeDate(date: Date): string {
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    weekday: 'long',
+  }).format(date);
 }
 
 function stepTarget(value: string, delta: number): number {
@@ -1813,14 +1818,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  homeContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  homeContent: { paddingBottom: 20 },
+  homeContainer: { flex: 1, paddingHorizontal: 22, paddingTop: 18 },
+  homeContent: { paddingBottom: 40 },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 22,
+    marginBottom: 28,
   },
+  ritualHeading: { flex: 1 },
+  ritualGreeting: { fontSize: 10, fontWeight: '800', letterSpacing: 2.1 },
+  ritualMark: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 52,
+  },
+  ritualSun: { borderRadius: 999, height: 17, marginTop: 8, width: 17 },
+  ritualHorizon: { height: 1, marginTop: -1, opacity: 0.55, width: 31 },
   brandGroup: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   brandMark: {
     borderRadius: 15,
@@ -1837,8 +1855,8 @@ const styles = StyleSheet.create({
     width: 16,
   },
   title: { fontSize: 32, fontWeight: '700', marginBottom: 40 },
-  homeTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { fontSize: 12, marginTop: 2 },
+  homeTitle: { fontSize: 27, fontWeight: '800', letterSpacing: -0.8, marginTop: 3 },
+  headerSubtitle: { fontSize: 13, marginTop: 3, textTransform: 'capitalize' },
   offlineBadge: {
     alignItems: 'center',
     borderRadius: 999,
@@ -1851,10 +1869,39 @@ const styles = StyleSheet.create({
   offlineLabel: { fontSize: 12, fontWeight: '700' },
   statusGroup: { alignItems: 'center', gap: 16, maxWidth: 480 },
   nextCard: {
-    borderRadius: 26,
-    marginBottom: 28,
+    borderRadius: 30,
+    marginBottom: 34,
+    minHeight: 286,
     overflow: 'hidden',
-    padding: 24,
+    padding: 26,
+  },
+  sunriseStage: {
+    backgroundColor: 'rgba(255,255,255,0.035)',
+    borderRadius: 999,
+    bottom: -155,
+    height: 330,
+    position: 'absolute',
+    right: -82,
+    width: 330,
+  },
+  sunriseOrb: {
+    borderRadius: 999,
+    bottom: -22,
+    height: 142,
+    opacity: 0.96,
+    position: 'absolute',
+    right: 28,
+    width: 142,
+  },
+  sunriseArc: {
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 999,
+    borderWidth: 1,
+    bottom: -74,
+    height: 220,
+    position: 'absolute',
+    right: -10,
+    width: 220,
   },
   heroGlowLarge: {
     borderRadius: 999,
@@ -1875,24 +1922,37 @@ const styles = StyleSheet.create({
     width: 54,
   },
   nextEyebrow: {
-    color: '#BFDDF8',
-    fontSize: 12,
+    color: '#C7D7D4',
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 2.2,
   },
   nextTime: {
     color: '#FFFFFF',
-    fontSize: 52,
-    fontWeight: '800',
-    letterSpacing: -2,
-    marginTop: 10,
+    fontSize: 66,
+    fontWeight: '700',
+    letterSpacing: -3.2,
+    lineHeight: 74,
+    marginTop: 12,
   },
-  nextTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  nextTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
+  heroRule: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    height: 1,
+    marginTop: 27,
+    width: '48%',
+  },
   nextMetaRow: {
+    alignItems: 'center',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 18,
+    gap: 11,
+    marginTop: 13,
+  },
+  metaDivider: {
+    backgroundColor: 'rgba(255,255,255,0.38)',
+    borderRadius: 999,
+    height: 3,
+    width: 3,
   },
   nextMetaPill: {
     backgroundColor: 'rgba(255,255,255,0.13)',
@@ -1900,7 +1960,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  nextMetaText: { color: '#EAF4FE', fontSize: 12, fontWeight: '700' },
+  nextMetaText: { color: '#D9E5E2', fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
   readyRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -1914,24 +1974,50 @@ const styles = StyleSheet.create({
     width: 8,
   },
   readyLabel: { color: '#DDF4EB', fontSize: 12, fontWeight: '700' },
-  quietHero: { minHeight: 204 },
-  quietHeroEyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
-  quietHeroTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.6,
-    lineHeight: 32,
-    marginTop: 14,
-    maxWidth: 290,
+  quietHero: { justifyContent: 'flex-end', minHeight: 250 },
+  emptySun: {
+    borderRadius: 999,
+    height: 130,
+    opacity: 0.9,
+    position: 'absolute',
+    right: -18,
+    top: -22,
+    width: 130,
   },
-  quietHeroBody: { fontSize: 14, lineHeight: 21, marginTop: 10, maxWidth: 300 },
+  quietHeroEyebrow: { color: '#C7D7D4', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
+  quietHeroTitle: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    lineHeight: 33,
+    marginTop: 14,
+    maxWidth: 260,
+  },
+  quietHeroBody: { color: '#C7D7D4', fontSize: 13, lineHeight: 20, marginTop: 10, maxWidth: 260 },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
+    justifyContent: 'space-between',
+    marginBottom: 15,
   },
-  sectionTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  sectionHeadingGroup: { flexDirection: 'row', alignItems: 'baseline', gap: 9 },
+  sectionTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
+  sectionMeta: { fontSize: 12, fontWeight: '500' },
+  sectionLine: { flex: 1, height: StyleSheet.hairlineWidth, marginLeft: 16 },
+  compactAdd: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  compactAddLabel: { fontSize: 13, fontWeight: '700' },
+  addGlyph: { height: 16, position: 'relative', width: 16 },
+  addGlyphHorizontal: { height: 1.5, left: 2, position: 'absolute', top: 7, width: 12 },
+  addGlyphVertical: { height: 12, left: 7, position: 'absolute', top: 2, width: 1.5 },
   countBadge: {
     alignItems: 'center',
     borderRadius: 999,
@@ -1941,10 +2027,11 @@ const styles = StyleSheet.create({
   },
   countLabel: { fontSize: 12, fontWeight: '800' },
   emptyCard: {
-    alignItems: 'center',
-    borderRadius: 22,
-    gap: 10,
-    padding: 28,
+    borderRadius: 16,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    minHeight: 112,
+    padding: 20,
   },
   emptyIcon: {
     alignItems: 'center',
@@ -1955,13 +2042,13 @@ const styles = StyleSheet.create({
     width: 56,
   },
   emptyIconText: { fontSize: 28, fontWeight: '400' },
-  emptyHeading: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  emptyHeading: { fontSize: 17, fontWeight: '700' },
   emptyBody: {
-    fontSize: 14,
-    lineHeight: 21,
-    maxWidth: 300,
-    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
   },
+  emptyArrow: { fontSize: 22, position: 'absolute', right: 20, top: 39 },
   homeErrorCard: { borderRadius: 18, gap: 8, marginBottom: 20, padding: 16 },
   homeErrorTitle: { fontSize: 15, fontWeight: '700' },
   homeErrorBody: { fontSize: 14, lineHeight: 20 },
@@ -1972,20 +2059,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   inlineActionLabel: { fontSize: 14, fontWeight: '700' },
-  alarmList: { gap: 12 },
+  alarmList: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
   alarmRow: {
     alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    elevation: 2,
     flexDirection: 'row',
-    minHeight: 94,
-    padding: 14,
-    shadowOffset: { height: 4, width: 0 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
+    minHeight: 102,
+    paddingHorizontal: 15,
+    position: 'relative',
   },
-  alarmEditAction: { alignItems: 'center', flex: 1, flexDirection: 'row' },
+  alarmDivider: { height: StyleSheet.hairlineWidth, left: 70, position: 'absolute', right: 15, top: 0 },
+  alarmRail: { borderRadius: 999, height: 34, marginRight: 13, width: 3 },
+  alarmEditAction: { alignItems: 'center', flex: 1, flexDirection: 'row', paddingVertical: 18 },
+  missionStamp: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    marginRight: 13,
+    width: 38,
+  },
+  missionStampText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   missionIcon: {
     alignItems: 'center',
     borderRadius: 14,
@@ -1995,12 +2089,12 @@ const styles = StyleSheet.create({
     width: 46,
   },
   missionIconText: { fontSize: 18, fontWeight: '900' },
-  alarmTimeColumn: { width: 68 },
-  alarmTime: { fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
-  alarmSchedule: { fontSize: 12, marginTop: 2 },
+  alarmTimeColumn: { width: 76 },
+  alarmTime: { fontSize: 23, fontWeight: '700', letterSpacing: -0.7 },
+  alarmSchedule: { fontSize: 11, marginTop: 3 },
   alarmDetail: { flex: 1, paddingHorizontal: 6 },
-  alarmLabel: { fontSize: 15, fontWeight: '800' },
-  alarmMission: { fontSize: 13, marginTop: 4 },
+  alarmLabel: { fontSize: 14, fontWeight: '700' },
+  alarmMission: { fontSize: 11, marginTop: 5 },
   alarmToggle: {
     alignItems: 'center',
     borderRadius: 999,
@@ -2017,22 +2111,23 @@ const styles = StyleSheet.create({
     width: 26,
   },
   toggleThumbEnabled: { alignSelf: 'flex-end' },
-  historySection: { gap: 10, marginTop: 28 },
+  historySection: { marginTop: 34 },
+  historyList: { borderTopWidth: 1 },
   historyItem: {
     alignItems: 'center',
-    borderRadius: 16,
     flexDirection: 'row',
     gap: 10,
-    minHeight: 52,
-    paddingHorizontal: 14,
+    minHeight: 54,
   },
   historyResult: {
     alignItems: 'center',
     borderRadius: 999,
-    height: 28,
+    borderWidth: 1,
+    height: 22,
     justifyContent: 'center',
-    width: 28,
+    width: 22,
   },
+  historyResultDot: { borderRadius: 999, height: 6, width: 6 },
   historyText: { flex: 1, fontSize: 13, fontWeight: '600' },
   heading: { fontSize: 20, fontWeight: '600', textAlign: 'center' },
   body: { fontSize: 16, lineHeight: 24, textAlign: 'center' },
@@ -2052,12 +2147,12 @@ const styles = StyleSheet.create({
   primaryLeading: { color: '#FFFFFF', fontSize: 23, fontWeight: '400' },
   primaryLabel: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   buildInfo: { fontSize: 12, paddingBottom: 8, textAlign: 'center' },
-  editorContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 12 },
-  editorHeader: { alignItems: 'center', flexDirection: 'row', gap: 14 },
+  editorContainer: { flex: 1, paddingHorizontal: 22, paddingTop: 14 },
+  editorHeader: { alignItems: 'center', flexDirection: 'row', gap: 16 },
   editorHeaderCopy: { flex: 1 },
-  editorEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  editorEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 2 },
   editorTitle: {
-    fontSize: 25,
+    fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.5,
     marginTop: 2,
@@ -2077,20 +2172,23 @@ const styles = StyleSheet.create({
     gap: 16,
     justifyContent: 'center',
   },
-  editorContent: { gap: 14, paddingBottom: 32, paddingTop: 22 },
+  editorReady: { flex: 1 },
+  editorContent: { paddingBottom: 20, paddingTop: 24 },
+  editorActionDock: { borderTopWidth: StyleSheet.hairlineWidth, paddingBottom: 10, paddingTop: 10 },
   timeCard: {
-    borderRadius: 26,
-    elevation: 3,
-    padding: 22,
+    borderRadius: 30,
+    elevation: 0,
+    marginBottom: 10,
+    padding: 24,
     shadowOffset: { height: 5, width: 0 },
-    shadowOpacity: 0.13,
-    shadowRadius: 10,
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   timeCardEyebrow: {
     color: '#BFDDF8',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 2,
   },
   timeCardHeading: {
     alignItems: 'center',
@@ -2099,8 +2197,8 @@ const styles = StyleSheet.create({
   },
   timeCardTitle: {
     color: '#FFFFFF',
-    fontSize: 19,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     letterSpacing: -0.3,
     marginTop: 3,
   },
@@ -2125,19 +2223,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   editorCard: {
-    borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    elevation: 1,
-    gap: 12,
-    padding: 20,
-    shadowOffset: { height: 3, width: 0 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 13,
+    paddingHorizontal: 2,
+    paddingVertical: 25,
   },
-  editorSectionEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  editorSectionMarker: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  editorSectionRule: { flex: 1, height: StyleSheet.hairlineWidth },
+  editorSectionEyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.8 },
   editorSectionTitle: {
-    fontSize: 19,
-    fontWeight: '800',
+    fontSize: 21,
+    fontWeight: '700',
     letterSpacing: -0.2,
     marginBottom: 2,
   },
@@ -2200,18 +2296,27 @@ const styles = StyleSheet.create({
   scheduleOption: {
     alignItems: 'center',
     borderRadius: 12,
-    elevation: 1,
+    elevation: 0,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
     minHeight: 52,
     shadowOffset: { height: 2, width: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   scheduleOptionTransparent: { backgroundColor: 'transparent' },
   scheduleOptionSymbol: { fontSize: 16, fontWeight: '900' },
+  scheduleIndicator: {
+    alignItems: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 14,
+    justifyContent: 'center',
+    width: 14,
+  },
+  scheduleIndicatorCore: { borderRadius: 999, height: 6, width: 6 },
   scheduleOptionLabel: { fontSize: 14, fontWeight: '800' },
   weeklyPicker: { gap: 9, marginTop: 4 },
   dayPickerLabel: { fontSize: 12, fontWeight: '600' },
@@ -2230,10 +2335,11 @@ const styles = StyleSheet.create({
   dayOptionCaptionSelected: { color: '#DDEEFF' },
   scheduleSummary: {
     alignItems: 'center',
-    borderRadius: 15,
+    borderRadius: 10,
     flexDirection: 'row',
     gap: 11,
-    padding: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   scheduleSummaryIcon: {
     alignItems: 'center',
@@ -2259,20 +2365,20 @@ const styles = StyleSheet.create({
   },
   missionChoices: { flexDirection: 'row', gap: 8 },
   missionCard: {
-    borderRadius: 16,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 1,
     flex: 1,
-    minHeight: 132,
-    padding: 12,
+    minHeight: 126,
+    padding: 13,
   },
   missionCardIcon: {
     alignItems: 'center',
-    borderRadius: 11,
-    height: 34,
+    borderRadius: 999,
+    height: 36,
     justifyContent: 'center',
-    width: 34,
+    width: 36,
   },
-  missionCardSymbol: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  missionCardSymbol: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   missionCardTitle: { fontSize: 14, fontWeight: '800', marginTop: 12 },
   missionCardDescription: { fontSize: 10, lineHeight: 14, marginTop: 2 },
   selectedMark: {
@@ -2360,7 +2466,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     minHeight: 56,
     justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 0,
   },
 });
 
