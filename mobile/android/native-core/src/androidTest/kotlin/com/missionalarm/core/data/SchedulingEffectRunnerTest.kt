@@ -92,6 +92,48 @@ class SchedulingEffectRunnerTest {
   }
 
   @Test
+  fun capabilityRevocationDowngradesHealthAndGrantReschedulesSameOccurrence() {
+    assertEquals(1, runner.drain())
+    assertEquals("SCHEDULED_OS", occurrence().state)
+
+    clock.nowMs += 100
+    assertEquals(1, capabilityReconciler().observe(granted = false, observationId = "loss-1"))
+    assertEquals(0, capabilityReconciler().observe(granted = false, observationId = "loss-1"))
+    assertEquals("PENDING_OS", occurrence().state)
+    assertEquals("EXACT_ALARM_CAPABILITY_REQUIRED", occurrence().lastErrorCode)
+    assertEquals("ACKNOWLEDGED", scheduleEffect().status)
+    assertEquals("BLOCKED_CAPABILITY", capabilityLossEffect().status)
+
+    clock.nowMs += 100
+    assertEquals(1, capabilityReconciler().observe(granted = true, observationId = "grant-1"))
+    assertEquals(0, capabilityReconciler().observe(granted = true, observationId = "grant-1"))
+    assertEquals("RETRYABLE", capabilityLossEffect().status)
+    assertEquals(1, runner.drain())
+
+    assertEquals(2, scheduler.scheduleCalls.size)
+    assertEquals(scheduler.scheduleCalls[0], scheduler.scheduleCalls[1])
+    assertEquals("SCHEDULED_OS", occurrence().state)
+    assertNull(occurrence().lastErrorCode)
+    assertEquals("ACKNOWLEDGED", capabilityLossEffect().status)
+  }
+
+  @Test
+  fun blockedInitialScheduleCanResumeAfterCapabilityGrant() {
+    scheduler.mode = FakeExactAlarmScheduler.Mode.CAPABILITY
+    assertEquals(1, runner.drain())
+    assertEquals("BLOCKED_CAPABILITY", scheduleEffect().status)
+
+    scheduler.mode = FakeExactAlarmScheduler.Mode.SUCCESS
+    clock.nowMs += 100
+    assertEquals(1, capabilityReconciler().observe(granted = true, observationId = "grant-2"))
+    assertEquals(1, runner.drain())
+
+    assertEquals("SCHEDULED_OS", occurrence().state)
+    assertNull(occurrence().lastErrorCode)
+    assertEquals("ACKNOWLEDGED", scheduleEffect().status)
+  }
+
+  @Test
   fun malformedPayloadIsDeadLetteredAndCannotSchedule() {
     database.openHelper.writableDatabase.execSQL(
       "UPDATE runtime_effect SET payload_json = '{}' WHERE effect_type = 'SCHEDULE_OCCURRENCE'",
@@ -230,6 +272,18 @@ class SchedulingEffectRunnerTest {
     database.reliabilityDao().findEffect("effect:v1:occurrence:$OCCURRENCE_ID:schedule"),
   )
 
+  private fun capabilityLossEffect() = checkNotNull(
+    database.reliabilityDao().findEffect(
+      "effect:v1:capability-loss:loss-1:occurrence:$OCCURRENCE_ID:schedule",
+    ),
+  )
+
+  private fun capabilityReconciler() = SchedulingCapabilityReconciler(
+    database,
+    clock,
+    EffectIdGenerator { "capability-effect-${++capabilityEffectSequence}" },
+  )
+
   private fun mirrorEffect() = checkNotNull(
     database.reliabilityDao().findEffect("effect:v1:alarm:$ALARM_ID:revision:2:direct-boot"),
   )
@@ -276,6 +330,7 @@ class SchedulingEffectRunnerTest {
   }
 
   private companion object {
+    var capabilityEffectSequence = 0
     val NOW_MS = Instant.parse("2026-08-29T00:00:00Z").toEpochMilli()
     val EXPECTED_NEXT_MS = Instant.parse("2026-08-30T23:00:00Z").toEpochMilli()
     const val OWNER = "runner-test-owner"

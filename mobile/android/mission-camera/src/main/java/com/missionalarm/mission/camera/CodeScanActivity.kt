@@ -37,17 +37,16 @@ class CodeScanActivity : ComponentActivity() {
   private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
   private var cameraProvider: ProcessCameraProvider? = null
   private var analyzer: CodeScannerAnalyzer? = null
+  private var cameraGeneration = 0
+  private var cameraStarting = false
+  private var recoveryBlocked = false
   private var delivered = false
 
   private val permissionLauncher = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { granted ->
-    if (granted) {
-      permissionPanel.visibility = View.GONE
-      startCamera()
-    } else {
-      showPermissionRecovery()
-    }
+    if (!granted) showPermissionRecovery()
+    reconcileCameraState()
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,19 +65,56 @@ class CodeScanActivity : ComponentActivity() {
     }
   }
 
+  override fun onResume() {
+    super.onResume()
+    if (::permissionPanel.isInitialized) reconcileCameraState()
+  }
+
+  override fun onStop() {
+    stopCamera()
+    super.onStop()
+  }
+
   override fun onDestroy() {
-    cameraProvider?.unbindAll()
-    analyzer?.close()
-    analyzer = null
+    stopCamera()
     cameraExecutor.shutdown()
     super.onDestroy()
   }
 
+  private fun reconcileCameraState() {
+    when (CameraLifecyclePolicy.decide(
+      missionReady = ::previewView.isInitialized,
+      terminal = delivered,
+      permissionGranted = hasCameraPermission(),
+      cameraStartingOrRunning = cameraStarting || analyzer != null,
+      recoveryBlocked = recoveryBlocked,
+    )) {
+      CameraLifecycleAction.START -> {
+        permissionPanel.visibility = View.GONE
+        startCamera()
+      }
+      CameraLifecycleAction.KEEP -> permissionPanel.visibility = View.GONE
+      CameraLifecycleAction.STOP -> stopCamera()
+      CameraLifecycleAction.STOP_AND_SHOW_PERMISSION -> {
+        stopCamera()
+        showPermissionRecovery()
+      }
+    }
+  }
+
   private fun startCamera() {
+    if (cameraStarting || analyzer != null || delivered || recoveryBlocked || !hasCameraPermission()) {
+      return
+    }
+    cameraStarting = true
+    val generation = ++cameraGeneration
     statusText.setText(R.string.code_scan_searching)
     val future = ProcessCameraProvider.getInstance(this)
     future.addListener({
-      runCatching {
+      if (generation != cameraGeneration || isFinishing || isDestroyed || !hasCameraPermission()) {
+        return@addListener
+      }
+      val result = runCatching {
         val provider = future.get()
         cameraProvider = provider
         val preview = Preview.Builder().build().also {
@@ -97,8 +133,19 @@ class CodeScanActivity : ComponentActivity() {
           .also { it.setAnalyzer(cameraExecutor, codeAnalyzer) }
         provider.unbindAll()
         provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
-      }.onFailure { showTerminalError() }
+      }
+      cameraStarting = false
+      result.onFailure { showTerminalError() }
     }, ContextCompat.getMainExecutor(this))
+  }
+
+  private fun stopCamera() {
+    cameraGeneration += 1
+    cameraStarting = false
+    cameraProvider?.unbindAll()
+    cameraProvider = null
+    analyzer?.close()
+    analyzer = null
   }
 
   private fun deliverEvidence(format: String) {
@@ -116,6 +163,8 @@ class CodeScanActivity : ComponentActivity() {
   private fun showTerminalError() {
     statusText.post {
       if (isFinishing || isDestroyed) return@post
+      recoveryBlocked = true
+      stopCamera()
       statusText.setText(R.string.code_scan_error)
       permissionButton.setText(R.string.code_scan_close)
       permissionButton.setOnClickListener { finish() }
@@ -124,6 +173,7 @@ class CodeScanActivity : ComponentActivity() {
   }
 
   private fun showPermissionRecovery() {
+    if (delivered || recoveryBlocked) return
     permissionPanel.visibility = View.VISIBLE
     permissionButton.setText(R.string.code_camera_permission_action)
     permissionButton.setOnClickListener {
@@ -136,6 +186,11 @@ class CodeScanActivity : ComponentActivity() {
       }
     }
   }
+
+  private fun hasCameraPermission() = ContextCompat.checkSelfPermission(
+    this,
+    Manifest.permission.CAMERA,
+  ) == PackageManager.PERMISSION_GRANTED
 
   private fun buildContent() {
     previewView = PreviewView(this).apply {

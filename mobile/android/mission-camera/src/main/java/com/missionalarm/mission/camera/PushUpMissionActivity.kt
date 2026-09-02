@@ -48,6 +48,9 @@ class PushUpMissionActivity : ComponentActivity() {
   private val sessionId = UUID.randomUUID().toString()
   private var cameraProvider: ProcessCameraProvider? = null
   private var analyzer: PushUpPoseAnalyzer? = null
+  private var cameraGeneration = 0
+  private var cameraStarting = false
+  private var recoveryBlocked = false
   private var instanceId: String? = null
   private var profileVersion: String? = null
   private var expectedRevision = 0
@@ -68,12 +71,8 @@ class PushUpMissionActivity : ComponentActivity() {
   private val permissionLauncher = registerForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { granted ->
-    if (granted) {
-      permissionPanel.visibility = View.GONE
-      if (missionLoaded) startCamera()
-    } else {
-      showPermissionRecovery()
-    }
+    if (!granted) showPermissionRecovery()
+    reconcileCameraState()
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,7 +90,12 @@ class PushUpMissionActivity : ComponentActivity() {
 
   override fun onResume() {
     super.onResume()
-    if (missionLoaded && analyzer == null && hasCameraPermission() && !terminal) startCamera()
+    if (::permissionPanel.isInitialized) reconcileCameraState()
+  }
+
+  override fun onStop() {
+    stopCamera()
+    super.onStop()
   }
 
   override fun onDestroy() {
@@ -146,11 +150,18 @@ class PushUpMissionActivity : ComponentActivity() {
   }
 
   private fun startCamera() {
-    if (analyzer != null || terminal || !missionLoaded) return
+    if (cameraStarting || analyzer != null || terminal || !missionLoaded || recoveryBlocked ||
+      !hasCameraPermission()
+    ) return
+    cameraStarting = true
+    val generation = ++cameraGeneration
     statusText.setText(R.string.pushup_find_body)
     val future = ProcessCameraProvider.getInstance(this)
     future.addListener({
-      runCatching {
+      if (generation != cameraGeneration || isFinishing || isDestroyed || !hasCameraPermission()) {
+        return@addListener
+      }
+      val result = runCatching {
         val provider = future.get()
         cameraProvider = provider
         val cameraPreview = Preview.Builder().build().also {
@@ -177,8 +188,31 @@ class PushUpMissionActivity : ComponentActivity() {
           cameraPreview,
           analysis,
         )
-      }.onFailure { showTerminalError(R.string.pushup_camera_error) }
+      }
+      cameraStarting = false
+      result.onFailure { showTerminalError(R.string.pushup_camera_error) }
     }, ContextCompat.getMainExecutor(this))
+  }
+
+  private fun reconcileCameraState() {
+    when (CameraLifecyclePolicy.decide(
+      missionReady = missionLoaded,
+      terminal = terminal,
+      permissionGranted = hasCameraPermission(),
+      cameraStartingOrRunning = cameraStarting || analyzer != null,
+      recoveryBlocked = recoveryBlocked,
+    )) {
+      CameraLifecycleAction.START -> {
+        permissionPanel.visibility = View.GONE
+        startCamera()
+      }
+      CameraLifecycleAction.KEEP -> permissionPanel.visibility = View.GONE
+      CameraLifecycleAction.STOP -> stopCamera()
+      CameraLifecycleAction.STOP_AND_SHOW_PERMISSION -> {
+        stopCamera()
+        showPermissionRecovery()
+      }
+    }
   }
 
   private fun renderUpdate(update: PushUpUpdate) {
@@ -236,6 +270,8 @@ class PushUpMissionActivity : ComponentActivity() {
   }
 
   private fun stopCamera() {
+    cameraGeneration += 1
+    cameraStarting = false
     cameraProvider?.unbindAll()
     cameraProvider = null
     analyzer?.close()
@@ -243,6 +279,7 @@ class PushUpMissionActivity : ComponentActivity() {
   }
 
   private fun showPermissionRecovery() {
+    if (terminal || recoveryBlocked) return
     permissionPanel.visibility = View.VISIBLE
     recoveryButton.setText(R.string.pushup_open_settings)
     recoveryButton.setOnClickListener {
@@ -259,13 +296,15 @@ class PushUpMissionActivity : ComponentActivity() {
   private fun showTerminalError(message: Int) {
     runOnUiThread {
       if (terminal || isFinishing || isDestroyed) return@runOnUiThread
+      recoveryBlocked = true
       stopCamera()
       statusText.setText(message)
       permissionPanel.visibility = View.VISIBLE
       recoveryButton.setText(R.string.pushup_retry)
       recoveryButton.setOnClickListener {
+        recoveryBlocked = false
         permissionPanel.visibility = View.GONE
-        startCamera()
+        reconcileCameraState()
       }
     }
   }

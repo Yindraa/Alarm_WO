@@ -2,6 +2,7 @@ package com.missionalarm.scheduling
 
 import android.content.Context
 import com.missionalarm.core.data.CurrentZoneProvider
+import com.missionalarm.core.data.AlarmScheduleReconciler
 import com.missionalarm.core.data.DirectBootDatabaseFactory
 import com.missionalarm.core.data.DirectBootJournalImporter
 import com.missionalarm.core.data.DirectBootMirrorEffectRunner
@@ -15,6 +16,7 @@ import com.missionalarm.core.data.RoomDirectBootMirrorStore
 import com.missionalarm.core.data.RuntimeEffectRunner
 import com.missionalarm.core.data.RuntimeStopEffectRunner
 import com.missionalarm.core.data.SchedulingEffectRunner
+import com.missionalarm.core.data.SchedulingCapabilityReconciler
 import com.missionalarm.core.data.TriggerTiming
 import com.missionalarm.core.data.TriggeredInstanceCoordinator
 import com.missionalarm.core.domain.OccurrenceId
@@ -26,7 +28,13 @@ import java.time.ZoneId
 import java.util.UUID
 
 object UnlockedAlarmReconciler {
-  fun reconcile(context: Context, timingOverrides: Map<String, TriggerTiming> = emptyMap()) {
+  fun reconcile(
+    context: Context,
+    timingOverrides: Map<String, TriggerTiming> = emptyMap(),
+    scheduleReconciliationId: String? = null,
+    exactAlarmCapabilityGranted: Boolean? = null,
+    capabilityObservationId: String? = null,
+  ) {
     val canonical = MissionAlarmDatabaseFactory.persistent(context)
     val boot = DirectBootDatabaseFactory.persistent(context)
     try {
@@ -50,40 +58,79 @@ object UnlockedAlarmReconciler {
       ) { System.currentTimeMillis() }
         .importPending(timingOverrides)
 
+      if (scheduleReconciliationId != null) {
+        val nowMs = System.currentTimeMillis()
+        canonical.runtimeDao().findDueOccurrenceIds(nowMs).forEach { occurrenceId ->
+          coordinator.getOrCreate(
+            OccurrenceId.parse(occurrenceId),
+            TriggerTiming(occurredAtMs = nowMs),
+          )
+        }
+        AlarmScheduleReconciler(
+          database = canonical,
+          wallClock = clock,
+          currentZoneProvider = CurrentZoneProvider { ZoneId.systemDefault() },
+          occurrenceIdGenerator = OccurrenceIdGenerator {
+            OccurrenceId.parse(UUID.randomUUID().toString())
+          },
+          effectIdGenerator = effectIdGenerator,
+        ).reconcile(scheduleReconciliationId)
+      }
+
+      if (exactAlarmCapabilityGranted != null) {
+        SchedulingCapabilityReconciler(
+          canonical,
+          clock,
+          effectIdGenerator,
+        ).observe(
+          exactAlarmCapabilityGranted,
+          checkNotNull(capabilityObservationId),
+        )
+      }
+
       val owner = LeaseOwnerGenerator { UUID.randomUUID().toString() }
-      RuntimeStopEffectRunner(
+      drainFully { RuntimeStopEffectRunner(
         canonical,
         clock,
         owner,
         AndroidAlarmRuntimeStopper(context),
-      ).drain()
-      RuntimeEffectRunner(
+      ).drain() }
+      drainFully { RuntimeEffectRunner(
         canonical,
         clock,
         owner,
         AndroidAlarmRuntimeStarter(context),
-      ).drain()
-      PresentationEffectRunner(
+      ).drain() }
+      drainFully { PresentationEffectRunner(
         canonical,
         clock,
         owner,
         AndroidAlarmHostPresenter(context),
-      ).drain()
-      SchedulingEffectRunner(
+      ).drain() }
+      drainFully { SchedulingEffectRunner(
         canonical,
         clock,
         owner,
         AndroidExactAlarmScheduler(context),
-      ).drain()
-      DirectBootMirrorEffectRunner(
+      ).drain() }
+      drainFully { DirectBootMirrorEffectRunner(
         canonical,
         clock,
         owner,
         RoomDirectBootMirrorStore(boot),
-      ).drain()
+      ).drain() }
     } finally {
       boot.close()
       canonical.close()
     }
   }
+
+  private fun drainFully(drainBatch: () -> Int) {
+    repeat(MAX_DRAIN_BATCHES) {
+      if (drainBatch() == 0) return
+    }
+    error("reconciliation effect drain exceeded safety bound")
+  }
+
+  private const val MAX_DRAIN_BATCHES = 64
 }

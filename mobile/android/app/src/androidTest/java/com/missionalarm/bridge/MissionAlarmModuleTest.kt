@@ -146,6 +146,39 @@ class MissionAlarmModuleTest {
   }
 
   @Test
+  fun exactAlarmCapabilityLossAndRecoveryReconcileHomeScheduleHealth() {
+    module.invalidate()
+    var capabilityGranted = true
+    module = testModule { capabilityGranted }
+    val saved = invoke { promise -> module.saveAlarmConfiguration(draft(), promise) }
+    val alarmId = (saved.value as ReadableMap).getString("aggregateId")!!
+    assertNull(invoke { promise -> module.enableAlarm(enable(alarmId), promise) }.error)
+
+    capabilityGranted = false
+    val blockedHome = invoke { promise -> module.getHomeSnapshot(2.0, promise) }
+    val blockedAlarm = (blockedHome.value as ReadableMap).getArray("alarms")!!.getMap(0)!!
+    assertEquals("BLOCKED", blockedAlarm.getString("scheduleHealth"))
+
+    capabilityGranted = true
+    val recoveredHome = invoke { promise -> module.getHomeSnapshot(2.0, promise) }
+    val recoveredAlarm = (recoveredHome.value as ReadableMap).getArray("alarms")!!.getMap(0)!!
+    assertEquals("HEALTHY", recoveredAlarm.getString("scheduleHealth"))
+  }
+
+  @Test
+  fun capabilityContractKeepsExactAlarmRequiredAndNotificationsAdvisory() {
+    val queried = invoke { promise -> module.getAlarmEditorSnapshot(2.0, null, promise) }
+    val capabilities = (queried.value as ReadableMap).getMap("capabilities")!!
+    val exactAlarm = capabilities.getMap("exactAlarm")!!
+    val notifications = capabilities.getMap("notifications")!!
+
+    assertTrue(exactAlarm.getBoolean("requiredForEnable"))
+    assertTrue(exactAlarm.getBoolean("canOpenSettings"))
+    assertFalse(notifications.getBoolean("requiredForEnable"))
+    assertTrue(notifications.getBoolean("canOpenSettings"))
+  }
+
+  @Test
   fun malformedEnableInputIsRejectedBeforeCapabilityInspection() {
     module.invalidate()
     module = testModule(capability = false)
@@ -400,9 +433,11 @@ class MissionAlarmModuleTest {
     }
   }
 
-  private fun testModule(capability: Boolean) = MissionAlarmModule(
+  private fun testModule(capability: Boolean) = testModule { capability }
+
+  private fun testModule(capability: () -> Boolean) = MissionAlarmModule(
     reactContext = context,
-    criticalSchedulingCapabilityOverride = { capability },
+    criticalSchedulingCapabilityOverride = capability,
     exactAlarmSchedulerOverride = ExactAlarmScheduler { _, _ -> },
     directBootMirrorStoreOverride = DirectBootMirrorStore { _, _ -> },
     alarmHostPresenterOverride = { instanceId -> presentedInstances += instanceId },

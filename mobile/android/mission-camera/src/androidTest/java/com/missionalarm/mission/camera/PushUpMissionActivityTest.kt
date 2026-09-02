@@ -3,6 +3,7 @@ package com.missionalarm.mission.camera
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.camera.view.PreviewView
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -53,6 +54,12 @@ class PushUpMissionActivityTest {
       assertNotNull(activity.findViewById<android.view.View>(R.id.pushup_phase))
       assertNotNull(activity.findViewById<android.view.View>(R.id.pushup_quality))
       assertNotNull(activity.findViewById<android.view.View>(R.id.pushup_back))
+      assertEquals(INSTANCE_ID, PushUpMissionActivity.validatedInstanceId(activity.intent))
+    }
+    scenario.moveToState(Lifecycle.State.CREATED)
+    scenario.moveToState(Lifecycle.State.RESUMED)
+    scenario.onActivity { activity ->
+      assertNotNull(activity.findViewById<PreviewView>(R.id.pushup_preview))
       assertEquals(INSTANCE_ID, PushUpMissionActivity.validatedInstanceId(activity.intent))
     }
     scenario.close()

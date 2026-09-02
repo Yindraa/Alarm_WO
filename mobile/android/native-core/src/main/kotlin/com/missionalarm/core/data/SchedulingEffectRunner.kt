@@ -268,7 +268,7 @@ class SchedulingEffectRunner(
   private fun retryDelayMs(attemptCount: Int): Long =
     (INITIAL_RETRY_MS shl (attemptCount - 1).coerceAtLeast(0)).coerceAtMost(MAX_RETRY_MS)
 
-  private companion object {
+  internal companion object {
     const val SCHEDULE_EFFECT_TYPE = "SCHEDULE_OCCURRENCE"
     const val CANCEL_EFFECT_TYPE = "CANCEL_OCCURRENCE"
     const val LEASE_DURATION_MS = 30_000L
@@ -277,7 +277,7 @@ class SchedulingEffectRunner(
     const val MAX_ATTEMPTS = 5
     const val DEFAULT_MAX_DRAIN = 16
     const val MAX_DRAIN_LIMIT = 64
-    const val ERROR_CAPABILITY_REQUIRED = "EXACT_ALARM_CAPABILITY_REQUIRED"
+    internal const val ERROR_CAPABILITY_REQUIRED = "EXACT_ALARM_CAPABILITY_REQUIRED"
     const val ERROR_TRANSIENT_SCHEDULING = "EXACT_ALARM_TRANSIENT_FAILURE"
     const val ERROR_RETRY_EXHAUSTED = "EXACT_ALARM_RETRY_EXHAUSTED"
     const val ERROR_INVALID_PAYLOAD = "INVALID_EFFECT_PAYLOAD"

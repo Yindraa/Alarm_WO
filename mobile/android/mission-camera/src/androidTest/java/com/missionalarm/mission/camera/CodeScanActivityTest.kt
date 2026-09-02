@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.view.View
 import androidx.camera.view.PreviewView
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -27,6 +28,15 @@ class CodeScanActivityTest {
       CodeScanActivity.intent(context, SESSION_TOKEN),
     )
 
+    scenario.onActivity { activity ->
+      assertNotNull(activity.findViewById<PreviewView>(R.id.code_scan_preview))
+      assertEquals(
+        View.GONE,
+        activity.findViewById<View>(R.id.code_scan_permission_panel).visibility,
+      )
+    }
+    scenario.moveToState(Lifecycle.State.CREATED)
+    scenario.moveToState(Lifecycle.State.RESUMED)
     scenario.onActivity { activity ->
       assertNotNull(activity.findViewById<PreviewView>(R.id.code_scan_preview))
       assertEquals(

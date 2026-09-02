@@ -40,6 +40,7 @@ import com.missionalarm.core.data.RuntimeEffectRunner
 import com.missionalarm.core.data.RuntimeStopEffectRunner
 import com.missionalarm.core.data.SaveAlarmDraftCommand
 import com.missionalarm.core.data.SchedulingEffectRunner
+import com.missionalarm.core.data.SchedulingCapabilityReconciler
 import com.missionalarm.core.data.StartMissionCommand
 import com.missionalarm.core.data.SubmitMathAnswerCommand
 import com.missionalarm.core.domain.AlarmId
@@ -99,6 +100,13 @@ class MissionAlarmModule(
         ?: AndroidExactAlarmScheduler(reactContext.applicationContext),
     )
   }
+  private val schedulingCapabilityReconcilerDelegate = lazy {
+    SchedulingCapabilityReconciler(
+      database = databaseDelegate.value,
+      wallClock = { System.currentTimeMillis() },
+      effectIdGenerator = EffectIdGenerator { UUID.randomUUID().toString() },
+    )
+  }
   private val directBootDatabaseDelegate = lazy {
     DirectBootDatabaseFactory.persistent(reactContext.applicationContext)
   }
@@ -149,11 +157,13 @@ class MissionAlarmModule(
   private val repository by repositoryDelegate
   private val schedulingRepository by schedulingRepositoryDelegate
   private val scheduleEffectRunner by scheduleEffectRunnerDelegate
+  private val schedulingCapabilityReconciler by schedulingCapabilityReconcilerDelegate
   private val mirrorEffectRunner by mirrorEffectRunnerDelegate
   private val runtimeEffectRunner by runtimeEffectRunnerDelegate
   private val presentationEffectRunner by presentationEffectRunnerDelegate
   private val runtimeStopEffectRunner by runtimeStopEffectRunnerDelegate
   private val mathCoordinator by mathCoordinatorDelegate
+  private var lastObservedCriticalSchedulingCapability: Boolean? = null
 
   override fun getName(): String = NAME
 
@@ -321,6 +331,7 @@ class MissionAlarmModule(
       try {
         requireContractVersion(contractVersion.toContractInt())
         val parsedAlarmId = alarmId?.let(AlarmId::parse)
+        reconcileCriticalSchedulingCapability()
         drainReliabilityEffects()
         val stored = parsedAlarmId?.let(repository::find)
         if (parsedAlarmId != null && stored == null) throw AlarmDraftRepositoryException.NotFound()
@@ -335,6 +346,7 @@ class MissionAlarmModule(
     executor.execute {
       try {
         requireContractVersion(contractVersion.toContractInt())
+        reconcileCriticalSchedulingCapability()
         val snapshot = database.runInTransaction<com.facebook.react.bridge.WritableMap> {
           homeSnapshot(
             database.alarmDao().findHomeAlarms(),
@@ -407,6 +419,17 @@ class MissionAlarmModule(
     runCatching { presentationEffectRunner.drain() }
     runCatching { scheduleEffectRunner.drain() }
     runCatching { mirrorEffectRunner.drain() }
+  }
+
+  private fun reconcileCriticalSchedulingCapability() {
+    val granted = hasCriticalSchedulingCapability()
+    if (lastObservedCriticalSchedulingCapability == granted) return
+    val recovered = schedulingCapabilityReconciler.observe(
+      granted = granted,
+      observationId = "app-capability-${UUID.randomUUID()}",
+    )
+    if (granted && recovered > 0) runCatching { scheduleEffectRunner.drain() }
+    lastObservedCriticalSchedulingCapability = granted
   }
 
   private fun editorSnapshot(stored: AlarmWithMission?) = Arguments.createMap().apply {

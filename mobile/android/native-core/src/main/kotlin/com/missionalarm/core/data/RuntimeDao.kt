@@ -318,6 +318,15 @@ abstract class RuntimeDao {
 
   @Query(
     """
+    SELECT * FROM alarm_occurrence
+    WHERE state = 'SCHEDULED_OS'
+    ORDER BY scheduled_at_utc_ms, id
+    """,
+  )
+  abstract fun findScheduledOccurrences(): List<AlarmOccurrenceEntity>
+
+  @Query(
+    """
     UPDATE alarm_occurrence
     SET state = 'CANCELLED', last_error_code = NULL, updated_at_ms = :updatedAtMs
     WHERE id = :occurrenceId AND state IN ('PENDING_OS', 'SCHEDULED_OS')
@@ -363,12 +372,24 @@ abstract class RuntimeDao {
   @Query(
     """
     UPDATE alarm_occurrence
-    SET last_error_code = :errorCode, updated_at_ms = :updatedAtMs
-    WHERE id = :occurrenceId AND state = 'PENDING_OS'
+    SET state = 'PENDING_OS', last_error_code = :errorCode, updated_at_ms = :updatedAtMs
+    WHERE id = :occurrenceId AND state IN ('PENDING_OS', 'SCHEDULED_OS')
     """,
   )
   abstract fun markOccurrenceSchedulingError(
     occurrenceId: String,
+    errorCode: String,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE alarm_occurrence
+    SET state = 'PENDING_OS', last_error_code = :errorCode, updated_at_ms = :updatedAtMs
+    WHERE state = 'SCHEDULED_OS'
+    """,
+  )
+  abstract fun markScheduledOccurrencesCapabilityBlocked(
     errorCode: String,
     updatedAtMs: Long,
   ): Int
@@ -616,6 +637,21 @@ abstract class ReliabilityDao {
   abstract fun blockCapability(
     effectId: String,
     owner: String,
+    errorCode: String,
+    updatedAtMs: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE runtime_effect
+    SET status = 'RETRYABLE', lease_owner = NULL, lease_until_ms = NULL,
+      next_attempt_at_ms = :updatedAtMs, updated_at_ms = :updatedAtMs
+    WHERE effect_type = 'SCHEDULE_OCCURRENCE'
+      AND status = 'BLOCKED_CAPABILITY'
+      AND last_error_code = :errorCode
+    """,
+  )
+  abstract fun releaseSchedulesAfterCapabilityRecovery(
     errorCode: String,
     updatedAtMs: Long,
   ): Int
